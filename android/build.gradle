@@ -1,0 +1,40 @@
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = "../build"
+
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+// Definir las versiones necesarias de las herramientas
+buildscript {
+    ext {
+        // Fijar la versión de Gradle (puedes poner la versión que prefieras)
+        gradle_version = '6.7.1'  // Usa la versión que necesites, por ejemplo 6.7.1
+
+        // Fijar la versión del Android Gradle Plugin
+        agp_version = '4.1.0'  // Cambia esto si necesitas una versión diferente
+    }
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "com.android.tools.build:gradle:$agp_version"
+    }
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
