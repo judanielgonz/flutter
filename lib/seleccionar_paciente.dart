@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'historial.dart';
+import 'chat.dart'; // Aseguramos que ChatPage esté importado
 
-class GestionarPage extends StatefulWidget {
-  final String? medicoId;
-  final String? medicoCorreo; // Nuevo parámetro para el correo del médico
+class SeleccionarPacientePage extends StatefulWidget {
+  final String medicoId;
+  final String medicoCorreo;
+  final bool isForChat; // Nuevo parámetro para indicar si es para el chat
 
-  const GestionarPage({Key? key, this.medicoId, this.medicoCorreo}) : super(key: key);
+  const SeleccionarPacientePage({
+    required this.medicoId,
+    required this.medicoCorreo,
+    this.isForChat = false, // Por defecto, es para historial
+    Key? key,
+  }) : super(key: key);
 
   @override
-  _GestionarPageState createState() => _GestionarPageState();
+  _SeleccionarPacientePageState createState() => _SeleccionarPacientePageState();
 }
 
-class _GestionarPageState extends State<GestionarPage> {
+class _SeleccionarPacientePageState extends State<SeleccionarPacientePage> {
   List<dynamic> pacientes = [];
   bool isLoading = true;
   final ApiService apiService = ApiService();
@@ -25,10 +32,7 @@ class _GestionarPageState extends State<GestionarPage> {
 
   Future<void> _fetchPacientes() async {
     try {
-      if (widget.medicoId == null) {
-        throw Exception('ID del médico no proporcionado');
-      }
-      final pacientesData = await apiService.getPacientesAsignados(widget.medicoId!);
+      final pacientesData = await apiService.getPacientesAsignados(widget.medicoId);
       setState(() {
         pacientes = pacientesData;
         isLoading = false;
@@ -44,16 +48,31 @@ class _GestionarPageState extends State<GestionarPage> {
   }
 
   void _verHistorial(String correoPaciente) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => HistorialPage(
-          correo: correoPaciente,
-          tipoUsuario: 'medico',
-          medicoCorreo: widget.medicoCorreo, // Pasamos el correo del médico
+    if (widget.isForChat) {
+      // Si es para el chat, navegamos a ChatPage
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatPage(
+            correo: widget.medicoCorreo,
+            tipoUsuario: 'medico',
+            pacienteCorreo: correoPaciente, // Correo del paciente seleccionado
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      // Si no es para el chat, navegamos a HistorialPage (comportamiento original)
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HistorialPage(
+            correo: correoPaciente,
+            tipoUsuario: 'medico',
+            medicoCorreo: widget.medicoCorreo,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -64,7 +83,7 @@ class _GestionarPageState extends State<GestionarPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
-          'Gestionar Pacientes',
+          'Seleccionar Paciente',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
@@ -110,13 +129,13 @@ class _GestionarPageState extends State<GestionarPage> {
       child: Column(
         children: [
           const Icon(
-            Icons.person_add,
+            Icons.person_search,
             size: 60,
             color: Colors.white,
           ),
           const SizedBox(height: 10),
           const Text(
-            "Gestionar Pacientes",
+            "Seleccionar Paciente",
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,

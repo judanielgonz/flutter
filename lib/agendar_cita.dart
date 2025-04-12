@@ -1,91 +1,101 @@
 import 'package:flutter/material.dart';
-import 'package:saludgest_app/api_service.dart';
+import 'api_service.dart';
 
 class AgendarCitaPage extends StatefulWidget {
   final String pacienteCorreo;
 
-  const AgendarCitaPage({super.key, required this.pacienteCorreo});
+  const AgendarCitaPage({required this.pacienteCorreo, Key? key}) : super(key: key);
 
   @override
   _AgendarCitaPageState createState() => _AgendarCitaPageState();
 }
 
 class _AgendarCitaPageState extends State<AgendarCitaPage> {
-  List<dynamic> _disponibilidad = [];
+  List<dynamic> _disponibilidades = [];
   bool _isLoading = true;
   String? _errorMessage;
+  String? _medicoCorreo;
+  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
     super.initState();
-    _fetchDisponibilidad();
+    _fetchPacienteData();
   }
 
-  Future<void> _fetchDisponibilidad() async {
-    try {
-      final apiService = ApiService();
-      final response = await apiService.getDisponibilidad();
-      setState(() {
-        _disponibilidad = response;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _agendarCita(String medicoCorreo, String dia, String horario, String medicoNombre) async {
-    // Mostrar un diálogo de confirmación antes de agendar la cita
-    final bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar Cita'),
-        content: Text(
-          '¿Estás seguro de que deseas agendar una cita con $medicoNombre el $dia a las $horario?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirmar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    final data = {
-      'pacienteCorreo': widget.pacienteCorreo,
-      'medicoCorreo': medicoCorreo,
-      'dia': dia,
-      'horario': horario,
-    };
-
+  Future<void> _fetchPacienteData() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final apiService = ApiService();
-      final response = await apiService.agendarCita(data);
+      final pacienteData = await _apiService.getPacienteByCorreo(widget.pacienteCorreo);
+      print('Datos del paciente: $pacienteData');
+      setState(() {
+        // El backend devuelve medico_asignado como un ID, necesitamos obtener el correo del médico
+        _medicoCorreo = pacienteData['medico_asignado'];
+      });
+
+      if (_medicoCorreo != null) {
+        print('Médico asignado encontrado. Obteniendo correo del médico...');
+        // Obtener los datos del médico para extraer su correo
+        final medicoData = await _apiService.obtenerPorId(_medicoCorreo!);
+        print('Datos del médico: $medicoData');
+        setState(() {
+          _medicoCorreo = medicoData['correo'];
+        });
+        print('Correo del médico asignado: $_medicoCorreo');
+        await _fetchDisponibilidades();
+      } else {
+        throw Exception('No tienes un médico asignado.');
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchDisponibilidades() async {
+    try {
+      final disponibilidades = await _apiService.getDisponibilidades(_medicoCorreo!);
+      print('Disponibilidades obtenidas: $disponibilidades');
+      setState(() {
+        _disponibilidades = disponibilidades;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _agendarCita(Map<String, dynamic> disponibilidad) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _apiService.agendarCita({
+        'pacienteCorreo': widget.pacienteCorreo,
+        'medicoCorreo': _medicoCorreo,
+        'dia': disponibilidad['dia'],
+        'horario': disponibilidad['horario'].split(', ')[0], // Tomar solo el primer horario si hay múltiples
+      });
+
       if (response['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cita agendada exitosamente')),
+          const SnackBar(content: Text('Cita agendada con éxito')),
         );
-        // Refrescar la disponibilidad después de agendar
-        await _fetchDisponibilidad();
+        Navigator.pop(context);
       } else {
-        setState(() {
-          _errorMessage = response['error'] ?? "Error desconocido.";
-        });
+        throw Exception('No se pudo agendar la cita: ${response['error'] ?? 'Error desconocido'}');
       }
     } catch (e) {
       setState(() {
@@ -103,46 +113,26 @@ class _AgendarCitaPageState extends State<AgendarCitaPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Agendar Cita'),
-        backgroundColor: Colors.teal.shade700,
+        backgroundColor: Colors.teal,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Text('Error al cargar la disponibilidad: $_errorMessage', style: const TextStyle(color: Colors.red)))
-              : _disponibilidad.isEmpty
-                  ? const Center(child: Text('No hay médicos disponibles'))
+              ? Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)))
+              : _disponibilidades.isEmpty
+                  ? const Center(child: Text('No hay disponibilidades para este médico.'))
                   : ListView.builder(
-                      padding: const EdgeInsets.all(16.0),
-                      itemCount: _disponibilidad.length,
+                      padding: const EdgeInsets.all(10),
+                      itemCount: _disponibilidades.length,
                       itemBuilder: (context, index) {
-                        final medico = _disponibilidad[index];
+                        final disponibilidad = _disponibilidades[index];
                         return Card(
-                          elevation: 4,
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          child: ExpansionTile(
-                            title: Text(
-                              medico['nombre'],
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text('Especialidad: ${medico['especialidad'] ?? 'No especificada'}'),
-                            children: medico['disponibilidad'].map<Widget>((disp) {
-                              return ListTile(
-                                title: Text('Día: ${disp['dia']}'),
-                                subtitle: Text('Horario: ${disp['horario']}'),
-                                trailing: ElevatedButton(
-                                  onPressed: () => _agendarCita(
-                                    medico['correo'],
-                                    disp['dia'],
-                                    disp['horario'],
-                                    medico['nombre'],
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.teal.shade700,
-                                  ),
-                                  child: const Text('Agendar'),
-                                ),
-                              );
-                            }).toList(),
+                          margin: const EdgeInsets.symmetric(vertical: 5),
+                          child: ListTile(
+                            title: Text('${disponibilidad['dia']}'),
+                            subtitle: Text('Horario: ${disponibilidad['horario']}'),
+                            trailing: const Icon(Icons.calendar_today, color: Colors.teal),
+                            onTap: () => _agendarCita(disponibilidad),
                           ),
                         );
                       },

@@ -7,12 +7,15 @@ class ChatPage extends StatefulWidget {
   final String correo;
   final String tipoUsuario;
   final String? medicoAsignado;
+  final String? pacienteCorreo; // Nuevo parámetro para el médico
 
   const ChatPage({
     required this.correo,
     required this.tipoUsuario,
     this.medicoAsignado,
-  });
+    this.pacienteCorreo,
+    Key? key,
+  }) : super(key: key);
 
   @override
   _ChatPageState createState() => _ChatPageState();
@@ -21,7 +24,6 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   List<dynamic> _messages = []; // Aseguramos que siempre sea una lista
-  List<dynamic> _pacientesAsignados = []; // Aseguramos que siempre sea una lista
   bool _isLoading = false;
   String? _errorMessage;
   String? _usuarioId;
@@ -80,21 +82,27 @@ class _ChatPageState extends State<ChatPage> {
               throw Exception('No tienes un médico asignado. Por favor, asigna un médico desde la pantalla principal.');
             }
           } else if (widget.tipoUsuario == 'medico') {
-            // Para médicos: obtener la lista de pacientes asignados
-            final pacientesResponse = await http.get(
-              Uri.parse('http://10.0.2.2:3000/api/pacientes/obtener-pacientes-asignados?medicoId=$_usuarioId'),
-            );
-            if (pacientesResponse.statusCode == 200) {
-              final pacientesData = jsonDecode(pacientesResponse.body);
-              if (pacientesData['success'] == true) {
-                setState(() {
-                  _pacientesAsignados = pacientesData['pacientes'] ?? [];
-                });
+            // Para médicos: obtener los datos del paciente seleccionado usando pacienteCorreo
+            if (widget.pacienteCorreo != null) {
+              final pacienteResponse = await http.get(
+                Uri.parse('http://10.0.2.2:3000/api/pacientes/obtener-por-correo?correo=${widget.pacienteCorreo}'),
+              );
+              if (pacienteResponse.statusCode == 200) {
+                final pacienteData = jsonDecode(pacienteResponse.body);
+                if (pacienteData['success'] == true) {
+                  setState(() {
+                    _otroUsuarioId = pacienteData['persona']['_id'];
+                    _otroUsuarioNombre = pacienteData['persona']['nombre_completo'];
+                  });
+                  await _fetchMessages();
+                } else {
+                  throw Exception('No se pudo obtener el paciente seleccionado');
+                }
               } else {
-                throw Exception('No se pudieron cargar los pacientes asignados');
+                throw Exception('Error al obtener el paciente seleccionado: ${pacienteResponse.statusCode}');
               }
             } else {
-              throw Exception('Error al cargar los pacientes asignados: ${pacientesResponse.statusCode}');
+              throw Exception('No se ha seleccionado un paciente para chatear');
             }
           }
         } else {
@@ -186,46 +194,20 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  void _seleccionarPaciente(String pacienteId, String pacienteNombre) {
-    setState(() {
-      _otroUsuarioId = pacienteId;
-      _otroUsuarioNombre = pacienteNombre;
-      _messages = []; // Limpiar mensajes anteriores, aseguramos que sea una lista vacía
-    });
-    _fetchMessages();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.tipoUsuario == 'paciente'
             ? "Chat con ${_otroUsuarioNombre ?? 'Médico'}"
-            : "Chat con Paciente"),
+            : "Chat con ${_otroUsuarioNombre ?? 'Paciente'}"),
         backgroundColor: Colors.teal,
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Text(_errorMessage!, style: TextStyle(color: Colors.red)))
-              : widget.tipoUsuario == 'medico' && _otroUsuarioId == null
-                  ? _buildPacienteSelector()
-                  : _buildChat(),
-    );
-  }
-
-  Widget _buildPacienteSelector() {
-    return ListView.builder(
-      padding: EdgeInsets.all(10),
-      itemCount: _pacientesAsignados.length,
-      itemBuilder: (context, index) {
-        final paciente = _pacientesAsignados[index];
-        return ListTile(
-          title: Text(paciente['nombre_completo'] ?? 'Sin nombre'),
-          subtitle: Text(paciente['correo'] ?? 'Sin correo'),
-          onTap: () => _seleccionarPaciente(paciente['_id'], paciente['nombre_completo'] ?? 'Sin nombre'),
-        );
-      },
+              ? Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)))
+              : _buildChat(),
     );
   }
 
@@ -234,7 +216,7 @@ class _ChatPageState extends State<ChatPage> {
       children: [
         Expanded(
           child: (_messages.isEmpty) // Verificamos directamente, ya que _messages nunca será null
-              ? Center(child: Text("No hay mensajes"))
+              ? const Center(child: Text("No hay mensajes"))
               : ListView.builder(
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {
@@ -243,8 +225,8 @@ class _ChatPageState extends State<ChatPage> {
                     return Align(
                       alignment: esEnviadoPorUsuario ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
-                        margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                        padding: EdgeInsets.all(10),
+                        margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: esEnviadoPorUsuario ? Colors.teal.shade100 : Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(10),
@@ -254,14 +236,14 @@ class _ChatPageState extends State<ChatPage> {
                           children: [
                             Text(
                               mensaje['contenido'] ?? 'Mensaje vacío',
-                              style: TextStyle(fontSize: 16),
+                              style: const TextStyle(fontSize: 16),
                             ),
-                            SizedBox(height: 5),
+                            const SizedBox(height: 5),
                             Text(
                               mensaje['fecha'] != null
                                   ? DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(mensaje['fecha']))
                                   : 'Fecha no disponible',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -271,7 +253,7 @@ class _ChatPageState extends State<ChatPage> {
                 ),
         ),
         Padding(
-          padding: EdgeInsets.all(10.0),
+          padding: const EdgeInsets.all(10.0),
           child: Row(
             children: [
               Expanded(
@@ -285,9 +267,9 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               IconButton(
-                icon: Icon(Icons.send, color: Colors.teal),
+                icon: const Icon(Icons.send, color: Colors.teal),
                 onPressed: _sendMessage,
               ),
             ],
@@ -295,5 +277,11 @@ class _ChatPageState extends State<ChatPage> {
         ),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
   }
 }

@@ -15,64 +15,96 @@ class _RegistrarDisponibilidadPageState extends State<RegistrarDisponibilidadPag
   final TextEditingController _fechaController = TextEditingController();
   final TextEditingController _horaInicioController = TextEditingController();
   final TextEditingController _horaFinController = TextEditingController();
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedHoraInicio;
+  TimeOfDay? _selectedHoraFin;
+  bool _isLoading = false;
   String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    print('Correo del médico en RegistrarDisponibilidadPage: ${widget.correo}');
-  }
+  final ApiService _apiService = ApiService();
 
   Future<void> _seleccionarFecha() async {
     DateTime? fechaSeleccionada = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
+      firstDate: DateTime.now(),
       lastDate: DateTime(2100),
     );
     if (fechaSeleccionada != null) {
       setState(() {
+        _selectedDate = fechaSeleccionada;
         _fechaController.text = DateFormat('yyyy-MM-dd').format(fechaSeleccionada);
       });
     }
   }
 
-  Future<void> _seleccionarHora(TextEditingController controller) async {
+  Future<void> _seleccionarHora(TextEditingController controller, bool isHoraInicio) async {
     TimeOfDay? horaSeleccionada = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
     );
     if (horaSeleccionada != null) {
       setState(() {
-        controller.text = horaSeleccionada.format(context);
+        if (isHoraInicio) {
+          _selectedHoraInicio = horaSeleccionada;
+          _horaInicioController.text = horaSeleccionada.format(context);
+        } else {
+          _selectedHoraFin = horaSeleccionada;
+          _horaFinController.text = horaSeleccionada.format(context);
+        }
       });
     }
   }
 
   Future<void> _registrarDisponibilidad() async {
-    try {
-      final apiService = ApiService();
-      final response = await apiService.registrarDisponibilidad({
-        'medicoCorreo': widget.correo,
-        'fecha': _fechaController.text,
-        'hora_inicio': _horaInicioController.text,
-        'hora_fin': _horaFinController.text,
+    if (_fechaController.text.isEmpty ||
+        _horaInicioController.text.isEmpty ||
+        _horaFinController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Por favor, completa todos los campos.';
       });
-      if (response['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Disponibilidad registrada con éxito")),
-          );
-          Navigator.pop(context);
-        }
-      } else {
+      return;
+    }
+
+    if (_selectedHoraInicio != null && _selectedHoraFin != null) {
+      final now = DateTime.now();
+      final inicio = DateTime(now.year, now.month, now.day, _selectedHoraInicio!.hour, _selectedHoraInicio!.minute);
+      final fin = DateTime(now.year, now.month, now.day, _selectedHoraFin!.hour, _selectedHoraFin!.minute);
+      if (fin.isBefore(inicio) || fin.isAtSameMomentAs(inicio)) {
         setState(() {
-          _errorMessage = response['error'] ?? 'Error al registrar disponibilidad';
+          _errorMessage = 'La hora de fin debe ser posterior a la hora de inicio.';
         });
+        return;
+      }
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final horario = '${_horaInicioController.text} - ${_horaFinController.text}';
+      final response = await _apiService.registrarDisponibilidad({
+        'correo': widget.correo,
+        'dia': _fechaController.text,
+        'horario': horario,
+      });
+
+      if (response['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Disponibilidad registrada con éxito')),
+        );
+        Navigator.pop(context);
+      } else {
+        throw Exception('No se pudo registrar la disponibilidad: ${response['error'] ?? 'Error desconocido'}');
       }
     } catch (e) {
       setState(() {
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
@@ -88,12 +120,20 @@ class _RegistrarDisponibilidadPageState extends State<RegistrarDisponibilidadPag
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20.0),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
             TextFormField(
               controller: _fechaController,
               readOnly: true,
               decoration: InputDecoration(
-                labelText: "Fecha",
-                hintText: "Selecciona una fecha",
+                labelText: 'Fecha',
+                hintText: 'Selecciona una fecha',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.calendar_today),
@@ -106,12 +146,12 @@ class _RegistrarDisponibilidadPageState extends State<RegistrarDisponibilidadPag
               controller: _horaInicioController,
               readOnly: true,
               decoration: InputDecoration(
-                labelText: "Hora Inicio",
-                hintText: "Selecciona una hora",
+                labelText: 'Hora Inicio',
+                hintText: 'Selecciona una hora',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.access_time),
-                  onPressed: () => _seleccionarHora(_horaInicioController),
+                  onPressed: () => _seleccionarHora(_horaInicioController, true),
                 ),
               ),
             ),
@@ -120,39 +160,43 @@ class _RegistrarDisponibilidadPageState extends State<RegistrarDisponibilidadPag
               controller: _horaFinController,
               readOnly: true,
               decoration: InputDecoration(
-                labelText: "Hora Fin",
-                hintText: "Selecciona una hora",
+                labelText: 'Hora Fin',
+                hintText: 'Selecciona una hora',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.access_time),
-                  onPressed: () => _seleccionarHora(_horaFinController),
+                  onPressed: () => _seleccionarHora(_horaFinController, false),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            if (_errorMessage != null)
-              Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.red),
-              ),
-            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _registrarDisponibilidad,
+                onPressed: _isLoading ? null : _registrarDisponibilidad,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00695C),
+                  backgroundColor: Colors.teal,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                 ),
-                child: const Text(
-                  "Registrar",
-                  style: TextStyle(fontSize: 18),
-                ),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        'Registrar Disponibilidad',
+                        style: TextStyle(fontSize: 18),
+                      ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _fechaController.dispose();
+    _horaInicioController.dispose();
+    _horaFinController.dispose();
+    super.dispose();
   }
 }

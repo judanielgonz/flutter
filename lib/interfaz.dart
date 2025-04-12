@@ -10,19 +10,23 @@ import 'gestionar.dart';
 import 'login.dart';
 import 'registro_medico.dart';
 import 'registrar_disponibilidad.dart';
-import 'agendar_cita.dart';
+import 'agendar_cita.dart' as agendarCita;
 import 'asignar_medico.dart';
+import 'seleccionar_paciente.dart';
 
 class InterfazPage extends StatefulWidget {
   final String correo;
   final String tipoUsuario;
   final String? medicoAsignado;
+  final String? usuarioId;
 
   const InterfazPage({
     required this.correo,
     required this.tipoUsuario,
     this.medicoAsignado,
-  });
+    this.usuarioId,
+    Key? key,
+  }) : super(key: key);
 
   @override
   _InterfazPageState createState() => _InterfazPageState();
@@ -35,7 +39,9 @@ class _InterfazPageState extends State<InterfazPage> {
   void initState() {
     super.initState();
     _medicoAsignado = widget.medicoAsignado;
-    _fetchUsuarioData(); // Cargar los datos del usuario al iniciar
+    if (widget.tipoUsuario == 'paciente') {
+      _fetchUsuarioData();
+    }
   }
 
   Future<void> _fetchUsuarioData() async {
@@ -52,7 +58,6 @@ class _InterfazPageState extends State<InterfazPage> {
         }
       }
     } catch (e) {
-      // Manejar el error si es necesario
       print('Error al cargar los datos del usuario: $e');
     }
   }
@@ -68,7 +73,6 @@ class _InterfazPageState extends State<InterfazPage> {
       ),
     );
     if (result == true) {
-      // Recargar los datos del usuario después de asignar un médico
       await _fetchUsuarioData();
       return _medicoAsignado != null;
     }
@@ -88,7 +92,7 @@ class _InterfazPageState extends State<InterfazPage> {
             onPressed: () {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => LoginPage()),
+                MaterialPageRoute(builder: (context) => const LoginPage()),
               );
             },
             tooltip: 'Cerrar sesión',
@@ -162,85 +166,178 @@ class _InterfazPageState extends State<InterfazPage> {
           crossAxisSpacing: 20,
           mainAxisSpacing: 20,
           children: [
-            if (widget.tipoUsuario == 'paciente' && _medicoAsignado == null)
-              _buildGridButton(
-                context,
-                "Asignar Médico",
-                AsignarMedicoPage(pacienteCorreo: widget.correo),
-                Icons.person_add_alt_1,
-                onTap: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AsignarMedicoPage(pacienteCorreo: widget.correo),
-                    ),
-                  );
-                  if (result == true) {
-                    await _fetchUsuarioData(); // Recargar los datos después de asignar
-                  }
-                },
-              ),
-            if (widget.tipoUsuario == 'paciente')
+            // Opciones para Paciente
+            if (widget.tipoUsuario == 'paciente') ...[
+              if (_medicoAsignado == null)
+                _buildGridButton(
+                  context,
+                  "Asignar Médico",
+                  AsignarMedicoPage(pacienteCorreo: widget.correo),
+                  Icons.person_add_alt_1,
+                  onTap: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AsignarMedicoPage(pacienteCorreo: widget.correo),
+                      ),
+                    );
+                    if (result == true) {
+                      await _fetchUsuarioData();
+                    }
+                  },
+                ),
               _buildGridButton(
                 context,
                 "Agendar Cita",
-                AgendarCitaPage(pacienteCorreo: widget.correo),
+                agendarCita.AgendarCitaPage(pacienteCorreo: widget.correo),
                 Icons.calendar_today,
               ),
-            if (widget.tipoUsuario == 'paciente' || widget.tipoUsuario == 'medico' || widget.tipoUsuario == 'secretario')
               _buildGridButton(
                 context,
                 "Mis Citas",
                 CitasPage(correo: widget.correo, tipoUsuario: widget.tipoUsuario),
                 Icons.event,
               ),
-            if (widget.tipoUsuario == 'medico')
+              _buildGridButton(
+                context,
+                "Chat",
+                null,
+                Icons.chat,
+                onTap: () async {
+                  if (await _checkMedicoAsignado(context)) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatPage(
+                          correo: widget.correo,
+                          tipoUsuario: widget.tipoUsuario,
+                          medicoAsignado: _medicoAsignado,
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+              _buildGridButton(
+                context,
+                "Historial",
+                HistorialPage(
+                  correo: widget.correo,
+                  tipoUsuario: widget.tipoUsuario,
+                  medicoCorreo: null,
+                ),
+                Icons.history,
+              ),
+            ],
+
+            // Opciones para Médico
+            if (widget.tipoUsuario == 'medico') ...[
+              _buildGridButton(
+                context,
+                "Mis Citas",
+                CitasPage(correo: widget.correo, tipoUsuario: widget.tipoUsuario),
+                Icons.event,
+              ),
               _buildGridButton(
                 context,
                 "Registrar Disponibilidad",
                 RegistrarDisponibilidadPage(correo: widget.correo),
                 Icons.schedule,
               ),
-            _buildGridButton(
-              context,
-              "Chat",
-              ChatPage(correo: widget.correo, tipoUsuario: widget.tipoUsuario, medicoAsignado: _medicoAsignado),
-              Icons.chat,
-              onTap: () async {
-                if (await _checkMedicoAsignado(context)) {
+              _buildGridButton(
+                context,
+                "Gestionar Paciente",
+                GestionarPage(
+                  medicoId: widget.usuarioId,
+                  medicoCorreo: widget.correo,
+                ),
+                Icons.person_add,
+              ),
+              _buildGridButton(
+                context,
+                "Historial de Paciente",
+                null,
+                Icons.history,
+                onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ChatPage(
-                        correo: widget.correo,
-                        tipoUsuario: widget.tipoUsuario,
-                        medicoAsignado: _medicoAsignado,
+                      builder: (context) => SeleccionarPacientePage(
+                        medicoId: widget.usuarioId!,
+                        medicoCorreo: widget.correo,
                       ),
                     ),
                   );
-                }
-              },
+                },
+              ),
+              _buildGridButton(
+                context,
+                "Chat",
+                null,
+                Icons.chat,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SeleccionarPacientePage(
+                        medicoId: widget.usuarioId!,
+                        medicoCorreo: widget.correo,
+                        isForChat: true,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+
+            // Opciones para Admin y Secretario
+            if (widget.tipoUsuario == 'admin' || widget.tipoUsuario == 'secretario') ...[
+              _buildGridButton(
+                context,
+                "Gestionar Paciente",
+                GestionarPage(
+                  medicoId: widget.usuarioId,
+                  medicoCorreo: widget.correo,
+                ),
+                Icons.person_add,
+              ),
+              if (widget.tipoUsuario == 'admin')
+                _buildGridButton(
+                  context,
+                  "Registrar Médico",
+                  RegistroMedicoPage(),
+                  Icons.medical_services,
+                ),
+            ],
+
+            // Opciones comunes para todos los usuarios
+            _buildGridButton(
+              context,
+              "Notificaciones",
+              NotificacionesPage(),
+              Icons.notifications,
             ),
-            _buildGridButton(context, "Historial", HistorialPage(correo: widget.correo), Icons.history),
-            _buildGridButton(context, "Notificaciones", NotificacionesPage(), Icons.notifications),
-            _buildGridButton(context, "Configuración", ConfiguracionPage(), Icons.settings),
-            if (widget.tipoUsuario == 'admin' || widget.tipoUsuario == 'secretario')
-              _buildGridButton(context, "Gestionar Paciente", GestionarPage(), Icons.person_add),
-            if (widget.tipoUsuario == 'admin')
-              _buildGridButton(context, "Registrar Médico", RegistroMedicoPage(), Icons.medical_services),
+            _buildGridButton(
+              context,
+              "Configuración",
+              ConfiguracionPage(),
+              Icons.settings,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildGridButton(BuildContext context, String text, Widget page, IconData icon, {VoidCallback? onTap}) {
+  Widget _buildGridButton(BuildContext context, String text, Widget? page, IconData icon, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap ?? () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => page),
-        );
+        if (page != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => page),
+          );
+        }
       },
       child: Container(
         decoration: BoxDecoration(

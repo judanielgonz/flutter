@@ -22,14 +22,7 @@ class _RegistroPageState extends State<RegistroPage> {
     final contrasena = _contrasenaController.text;
     final telefono = _telefonoController.text;
 
-    // Validación de contraseña segura (RNF-001)
-    RegExp passwordRegExp = RegExp(r'^(?=.*[A-Z])(?=.*\d)(?=.*[!@#\$&*~]).{8,}$');
-    if (!passwordRegExp.hasMatch(contrasena)) {
-      setState(() {
-        _errorMessage = "La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial.";
-      });
-      return;
-    }
+    
 
     if (nombreCompleto.isEmpty || correo.isEmpty || contrasena.isEmpty || telefono.isEmpty) {
       setState(() {
@@ -179,3 +172,5 @@ class _RegistroPageState extends State<RegistroPage> {
     );
   }
 }
+
+//este codigo se llama registro.dart

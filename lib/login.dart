@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:saludgest_app/api_service.dart';
-import 'package:saludgest_app/interfaz.dart'; // Importamos interfaz.dart
+import 'package:saludgest_app/interfaz.dart';
+import 'package:saludgest_app/notificaciones_service.dart';
 import 'package:saludgest_app/registro.dart';
 import 'package:saludgest_app/registro_medico.dart';
 
@@ -16,6 +17,13 @@ class _LoginPageState extends State<LoginPage> {
   final _contrasenaController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
+  final NotificacionesService _notificacionesService = NotificacionesService();
+
+  @override
+  void initState() {
+    super.initState();
+    _notificacionesService.initialize(); // Inicializar las notificaciones
+  }
 
   // Función para normalizar texto (eliminar acentos)
   String _normalize(String text) {
@@ -45,8 +53,14 @@ class _LoginPageState extends State<LoginPage> {
         // Normalizamos el tipoUsuario para manejar acentos
         final tipoUsuario = _normalize(response['tipoUsuario']);
         
+        // Enviar notificación de inicio de sesión exitoso
+        await _notificacionesService.showNotification(
+          '¡Bienvenido a SaludGest!',
+          'Has iniciado sesión como $tipoUsuario.',
+        );
+
         if (tipoUsuario == 'paciente' || tipoUsuario == 'medico') {
-          // Redirigimos a InterfazPage para pacientes y médicos
+          // Redirigimos a InterfazPage para pacientes y médicos, pasando el usuarioId
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -54,6 +68,7 @@ class _LoginPageState extends State<LoginPage> {
                 correo: _correoController.text,
                 tipoUsuario: tipoUsuario,
                 medicoAsignado: response['medicoAsignado'],
+                usuarioId: response['usuarioId'],
               ),
             ),
           );
@@ -194,5 +209,12 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _correoController.dispose();
+    _contrasenaController.dispose();
+    super.dispose();
   }
 }

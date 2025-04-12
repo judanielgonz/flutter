@@ -82,3 +82,4 @@ class _ConfiguracionPageState extends State<ConfiguracionPage> {
     );
   }
 }
+//este codigo se llama configuracion.dart

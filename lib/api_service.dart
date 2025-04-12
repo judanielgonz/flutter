@@ -14,7 +14,13 @@ class ApiService {
     );
     print('Respuesta del servidor al hacer login: ${response.body}');
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      final data = json.decode(response.body);
+      return {
+        'success': data['success'],
+        'tipoUsuario': data['tipoUsuario'],
+        'medicoAsignado': data['medicoAsignado'],
+        'usuarioId': data['usuarioId'],
+      };
     } else {
       return json.decode(response.body);
     }
@@ -43,11 +49,11 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: json.encode(data),
     );
-    print('Respuesta del servidor al registrar médico: ${response.statusCode} - ${response.body}'); // Depuración
-    if (response.statusCode == 201 || response.statusCode == 200) { // Aceptar 200 y 201 como éxito
+    print('Respuesta del servidor al registrar médico: ${response.statusCode} - ${response.body}');
+    if (response.statusCode == 201 || response.statusCode == 200) {
       final responseBody = json.decode(response.body);
       return {
-        'success': responseBody['success'] ?? true, // Asegurar que siempre haya un success
+        'success': responseBody['success'] ?? true,
         'error': responseBody['error'] ?? null,
       };
     } else {
@@ -93,49 +99,62 @@ class ApiService {
     }
   }
 
-  // Registrar disponibilidad de médico
+  // Registrar disponibilidad
   Future<Map<String, dynamic>> registrarDisponibilidad(Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/pacientes/registrar-disponibilidad');
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
-        'correo': data['medicoCorreo'],
-        'dia': data['fecha'],
-        'horario': '${data['hora_inicio']} - ${data['hora_fin']}',
+        'correo': data['correo'],
+        'dia': data['dia'],
+        'horario': data['horario'], // Formato: "inicio - fin"
       }),
-    );
-    if (response.statusCode == 201) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Error al registrar la disponibilidad: ${response.body}');
-    }
-  }
-
-  // Obtener disponibilidad de médicos
-  Future<List<dynamic>> getDisponibilidad() async {
-    final url = Uri.parse('$baseUrl/api/pacientes/disponibilidad');
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Error al obtener la disponibilidad: ${response.body}');
-    }
-  }
-
-  // Agendar cita
-  Future<Map<String, dynamic>> agendarCita(Map<String, dynamic> data) async {
-    final url = Uri.parse('$baseUrl/api/pacientes/agendar-cita');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode(data),
     );
     final responseBody = json.decode(response.body);
     if (response.statusCode == 201) {
       return responseBody;
     } else {
-      throw Exception(responseBody['error'] ?? 'Error al agendar la cita');
+      throw Exception(responseBody['error'] ?? 'Error al registrar la disponibilidad: ${response.body}');
+    }
+  }
+
+  // Obtener disponibilidades
+  Future<List<dynamic>> getDisponibilidades(String medicoCorreo) async {
+    final url = Uri.parse('$baseUrl/api/pacientes/disponibilidad');
+    print('Solicitando disponibilidades a: $url');
+    final response = await http.get(url);
+    print('Respuesta del servidor (disponibilidades): ${response.statusCode} - ${response.body}');
+    if (response.statusCode == 200) {
+      final disponibilidades = json.decode(response.body);
+      print('Disponibilidades recibidas: $disponibilidades');
+      // Filtrar las disponibilidades por el correo del médico
+      final filteredDisponibilidades = disponibilidades.where((disp) => disp['correo'] == medicoCorreo).toList();
+      print('Disponibilidades filtradas para medicoCorreo=$medicoCorreo: $filteredDisponibilidades');
+      return filteredDisponibilidades;
+    } else {
+      throw Exception('Error al obtener las disponibilidades: ${response.body}');
+    }
+  }
+
+  // Agendar una cita
+  Future<Map<String, dynamic>> agendarCita(Map<String, dynamic> data) async {
+    final url = Uri.parse('$baseUrl/api/pacientes/agendar-cita');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'pacienteCorreo': data['pacienteCorreo'],
+        'medicoCorreo': data['medicoCorreo'],
+        'dia': data['dia'],
+        'horario': data['horario'], // Formato: "inicio - fin"
+      }),
+    );
+    final responseBody = json.decode(response.body);
+    if (response.statusCode == 201) {
+      return responseBody;
+    } else {
+      throw Exception(responseBody['error'] ?? 'Error al agendar la cita: ${response.body}');
     }
   }
 
@@ -143,12 +162,14 @@ class ApiService {
   Future<List<dynamic>> getCitas(String correo, String tipoUsuario) async {
     final url = Uri.parse('$baseUrl/api/pacientes/citas?correo=$correo&tipoUsuario=$tipoUsuario');
     final response = await http.get(url);
+    print('URL solicitada: $url');
+    print('Respuesta del servidor: ${response.statusCode} - ${response.body}');
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       if (data['success'] == true) {
         return data['citas'] ?? [];
       } else {
-        throw Exception(data['error'] ?? 'Error al obtener las citas');
+        throw Exception(data['message'] ?? 'Error al obtener las citas');
       }
     } else {
       throw Exception('Error al obtener las citas: ${response.body}');
@@ -159,6 +180,8 @@ class ApiService {
   Future<Map<String, dynamic>> getPacienteByCorreo(String correo) async {
     final url = Uri.parse('$baseUrl/api/pacientes/datos?correo=$correo');
     final response = await http.get(url);
+    print('Solicitando datos del paciente a: $url');
+    print('Respuesta del servidor (datos paciente): ${response.statusCode} - ${response.body}');
     if (response.statusCode == 200) {
       final List<dynamic> pacientes = json.decode(response.body);
       if (pacientes.isNotEmpty) {
@@ -168,6 +191,24 @@ class ApiService {
       }
     } else {
       throw Exception('Error al obtener el paciente: ${response.body}');
+    }
+  }
+
+  // Obtener persona por ID
+  Future<Map<String, dynamic>> obtenerPorId(String id) async {
+    final url = Uri.parse('$baseUrl/api/pacientes/obtener-por-id?id=$id');
+    final response = await http.get(url);
+    print('Solicitando datos de la persona por ID a: $url');
+    print('Respuesta del servidor (obtener por ID): ${response.statusCode} - ${response.body}');
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return data['persona'];
+      } else {
+        throw Exception(data['message'] ?? 'Persona no encontrada');
+      }
+    } else {
+      throw Exception('Error al obtener la persona por ID: ${response.body}');
     }
   }
 
@@ -195,16 +236,55 @@ class ApiService {
     }
   }
 
-  // Registrar historial médico
-  Future<void> registrarHistorialMedico(String correo, Map<String, dynamic> data) async {
-    final url = Uri.parse('$baseUrl/api/pacientes/registrar-historial');
+  // Obtener historial médico por correo
+  Future<List<dynamic>> getHistorialMedico(String correo) async {
+    final url = Uri.parse('$baseUrl/api/historial/obtener-por-correo?correo=$correo');
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return data['historial'] ?? [];
+      } else {
+        throw Exception(data['error'] ?? 'Error al obtener el historial médico');
+      }
+    } else {
+      throw Exception('Error al obtener el historial médico: ${response.body}');
+    }
+  }
+
+  // Guardar una entrada en el historial médico
+  Future<Map<String, dynamic>> guardarEntradaHistorial(String correoRegistrador, String tipo, Map<String, dynamic> datos) async {
+    final url = Uri.parse('$baseUrl/api/historial/guardar-entrada');
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({'correo': correo, 'historial': data}),
+      body: json.encode({
+        'correo': correoRegistrador,
+        'tipo': tipo,
+        'datos': datos,
+      }),
     );
-    if (response.statusCode != 200) {
-      throw Exception('Error al registrar historial: ${response.body}');
+    final responseBody = json.decode(response.body);
+    if (response.statusCode == 200 && responseBody['success'] == true) {
+      return responseBody;
+    } else {
+      throw Exception(responseBody['error'] ?? 'Error al guardar la entrada en el historial: ${response.body}');
+    }
+  }
+
+  // Obtener pacientes asignados a un médico
+  Future<List<dynamic>> getPacientesAsignados(String medicoId) async {
+    final url = Uri.parse('$baseUrl/api/pacientes/obtener-pacientes-asignados?medicoId=$medicoId');
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return data['pacientes'] ?? [];
+      } else {
+        throw Exception(data['error'] ?? 'Error al obtener los pacientes asignados');
+      }
+    } else {
+      throw Exception('Error al obtener los pacientes asignados: ${response.body}');
     }
   }
 
