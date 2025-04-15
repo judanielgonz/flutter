@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:http_parser/http_parser.dart';
 
 class ApiService {
-  final String baseUrl = 'http://10.0.2.2:3000'; // Ajustar según entorno (localhost para emulador Android)
+  final String baseUrl = 'http://10.0.2.2:3000';
 
   // Login
   Future<Map<String, dynamic>> login(Map<String, String> credentials) async {
@@ -108,9 +111,13 @@ class ApiService {
       body: json.encode({
         'correo': data['correo'],
         'dia': data['dia'],
-        'horario': data['horario'], // Formato: "inicio - fin"
+        'horario': data['horario'],
+        'consultorio': data['consultorio'], // Añadimos el campo consultorio
       }),
     );
+    print('Solicitando registrar disponibilidad a: $url');
+    print('Datos enviados: ${json.encode(data)}');
+    print('Respuesta del servidor: ${response.statusCode} - ${response.body}');
     final responseBody = json.decode(response.body);
     if (response.statusCode == 201) {
       return responseBody;
@@ -127,10 +134,7 @@ class ApiService {
     print('Respuesta del servidor (disponibilidades): ${response.statusCode} - ${response.body}');
     if (response.statusCode == 200) {
       final disponibilidades = json.decode(response.body);
-      print('Disponibilidades recibidas: $disponibilidades');
-      // Filtrar las disponibilidades por el correo del médico
       final filteredDisponibilidades = disponibilidades.where((disp) => disp['correo'] == medicoCorreo).toList();
-      print('Disponibilidades filtradas para medicoCorreo=$medicoCorreo: $filteredDisponibilidades');
       return filteredDisponibilidades;
     } else {
       throw Exception('Error al obtener las disponibilidades: ${response.body}');
@@ -147,7 +151,7 @@ class ApiService {
         'pacienteCorreo': data['pacienteCorreo'],
         'medicoCorreo': data['medicoCorreo'],
         'dia': data['dia'],
-        'horario': data['horario'], // Formato: "inicio - fin"
+        'horario': data['horario'],
       }),
     );
     final responseBody = json.decode(response.body);
@@ -240,6 +244,8 @@ class ApiService {
   Future<List<dynamic>> getHistorialMedico(String correo) async {
     final url = Uri.parse('$baseUrl/api/historial/obtener-por-correo?correo=$correo');
     final response = await http.get(url);
+    print('Solicitando historial médico a: $url');
+    print('Respuesta del servidor (historial): ${response.statusCode} - ${response.body}');
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       if (data['success'] == true) {
@@ -248,12 +254,13 @@ class ApiService {
         throw Exception(data['error'] ?? 'Error al obtener el historial médico');
       }
     } else {
-      throw Exception('Error al obtener el historial médico: ${response.body}');
+      throw Exception('Error al obtener el historial médico: ${response.statusCode} - ${response.body}');
     }
   }
 
   // Guardar una entrada en el historial médico
-  Future<Map<String, dynamic>> guardarEntradaHistorial(String correoRegistrador, String tipo, Map<String, dynamic> datos) async {
+  Future<Map<String, dynamic>> guardarEntradaHistorial(
+      String correoRegistrador, String tipo, Map<String, dynamic> datos) async {
     final url = Uri.parse('$baseUrl/api/historial/guardar-entrada');
     final response = await http.post(
       url,
@@ -264,11 +271,68 @@ class ApiService {
         'datos': datos,
       }),
     );
+    print('Solicitando guardar entrada en historial a: $url');
+    print('Respuesta del servidor (guardar entrada): ${response.statusCode} - ${response.body}');
     final responseBody = json.decode(response.body);
     if (response.statusCode == 200 && responseBody['success'] == true) {
       return responseBody;
     } else {
       throw Exception(responseBody['error'] ?? 'Error al guardar la entrada en el historial: ${response.body}');
+    }
+  }
+
+  // Subir un documento al historial médico
+  Future<Map<String, dynamic>> subirDocumento(
+      String correoRegistrador, String pacienteCorreo, File file) async {
+    final url = Uri.parse('$baseUrl/api/historial/subir-documento');
+    final request = http.MultipartRequest('POST', url);
+    request.fields['correo'] = correoRegistrador;
+    request.fields['pacienteCorreo'] = pacienteCorreo;
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'documento',
+        file.path,
+        contentType: MediaType('application', 'pdf'),
+      ),
+    );
+    print('Subiendo documento a: $url');
+    print('Archivo: ${file.path}');
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+
+    print('Código de estado al subir documento: ${response.statusCode}');
+    print('Respuesta del servidor: $responseBody');
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(responseBody);
+      if (decoded['success'] == true) {
+        return decoded;
+      } else {
+        throw Exception(decoded['error'] ?? 'Error al subir el documento');
+      }
+    } else {
+      throw Exception('Error al subir el documento: ${response.statusCode} - $responseBody');
+    }
+  }
+
+  // Descargar un documento del historial médico
+  Future<String> descargarDocumento(String historialId, String documentoId) async {
+    final url = Uri.parse('$baseUrl/api/historial/descargar-documento/$historialId/$documentoId');
+    print('Descargando documento desde: $url');
+    final response = await http.get(url);
+    print('Código de estado al descargar documento: ${response.statusCode}');
+    print('Encabezados de respuesta: ${response.headers}');
+
+    if (response.statusCode == 200) {
+      final bytes = response.bodyBytes;
+      final dir = await getTemporaryDirectory();
+      final filePath = '${dir.path}/documento-$documentoId.pdf';
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+      print('Documento descargado y guardado en: $filePath');
+      return filePath;
+    } else {
+      throw Exception('Error al descargar el documento: ${response.statusCode} - ${response.body}');
     }
   }
 

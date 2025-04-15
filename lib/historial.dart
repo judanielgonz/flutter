@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:open_file/open_file.dart';
+import 'dart:io';
 
 class HistorialPage extends StatefulWidget {
-  final String correo; // Correo del usuario cuyo historial se muestra (paciente)
+  final String correo;
   final String tipoUsuario;
-  final String? medicoCorreo; // Correo del médico que está modificando el historial
+  final String? medicoCorreo;
 
   const HistorialPage({
     required this.correo,
@@ -22,7 +25,6 @@ class _HistorialPageState extends State<HistorialPage> {
   bool isLoading = true;
   final ApiService apiService = ApiService();
 
-  // Controladores para los diferentes tipos de entradas
   final TextEditingController _sintomaController = TextEditingController();
   final TextEditingController _diagnosticoController = TextEditingController();
   final TextEditingController _tratamientoController = TextEditingController();
@@ -39,6 +41,7 @@ class _HistorialPageState extends State<HistorialPage> {
   Future<void> _fetchHistorial() async {
     try {
       final historialData = await apiService.getHistorialMedico(widget.correo);
+      print('Historial recibido: $historialData'); // Para depurar
       setState(() {
         historial = historialData;
         isLoading = false;
@@ -89,6 +92,69 @@ class _HistorialPageState extends State<HistorialPage> {
     }
   }
 
+  Future<void> _subirDocumento() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        File file = File(result.files.single.path!);
+        final String correoRegistrador = widget.tipoUsuario == 'medico' ? widget.medicoCorreo ?? '' : widget.correo;
+        if (correoRegistrador.isEmpty) {
+          throw Exception('Correo del registrador no proporcionado');
+        }
+
+        await apiService.subirDocumento(correoRegistrador, widget.correo, file);
+        await _fetchHistorial();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Documento PDF subido con éxito'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se seleccionó ningún archivo'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al subir el documento: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  Future<void> _descargarDocumento(String historialId, String documentoId) async {
+    try {
+      final filePath = await apiService.descargarDocumento(historialId, documentoId);
+      final result = await OpenFile.open(filePath);
+      if (result.type != ResultType.done) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo abrir el documento: ${result.message}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al descargar el documento: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
   void _mostrarDialogoAgregarEntrada() {
     if (widget.tipoUsuario == 'paciente') {
       _mostrarDialogoAgregarSintoma();
@@ -113,6 +179,7 @@ class _HistorialPageState extends State<HistorialPage> {
             _buildDialogOption('Diagnóstico', () => _mostrarDialogoAgregarDiagnostico()),
             _buildDialogOption('Tratamiento', () => _mostrarDialogoAgregarTratamiento()),
             _buildDialogOption('Medicamento', () => _mostrarDialogoAgregarMedicamento()),
+            _buildDialogOption('Subir Documento PDF', () => _subirDocumento()),
           ],
         ),
         actions: [
@@ -310,7 +377,6 @@ class _HistorialPageState extends State<HistorialPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // Se eliminó el título del AppBar para evitar la duplicación
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
           onPressed: () => Navigator.pop(context),
@@ -379,7 +445,6 @@ class _HistorialPageState extends State<HistorialPage> {
             color: Colors.white,
           ),
           const SizedBox(height: 20),
-          // Restauramos el texto "Historial Médico" aquí
           const Text(
             "Historial Médico",
             style: TextStyle(
@@ -453,6 +518,9 @@ class _HistorialPageState extends State<HistorialPage> {
             if (entrada['resultados_analisis']?.isNotEmpty ?? false) ...[
               _buildCategorySection('Resultados de Análisis', entrada['resultados_analisis'], Icons.analytics, Colors.purple),
             ],
+            if (entrada['documentos']?.isNotEmpty ?? false) ...[
+              _buildDocumentSection('Documentos', entrada['documentos'], entrada['_id'], Icons.picture_as_pdf, Colors.teal),
+            ],
           ],
         ),
       ),
@@ -517,6 +585,70 @@ class _HistorialPageState extends State<HistorialPage> {
                       ),
                     ],
                   ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildDocumentSection(String title, List<dynamic> documents, String historialId, IconData icon, Color color) {
+    return ExpansionTile(
+      leading: Icon(icon, color: color, size: 30),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
+          color: color,
+        ),
+      ),
+      children: documents.map((doc) {
+        String documentoId = doc['_id'] ?? 'Sin ID';
+        String fecha = doc['fecha'] ?? 'Sin fecha';
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, color: color, size: 24),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Documento PDF',
+                        style: TextStyle(fontSize: 16, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        'Fecha: $fecha',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.download, color: Colors.teal),
+                  onPressed: () => _descargarDocumento(historialId, documentoId),
+                  tooltip: 'Descargar y abrir PDF',
                 ),
               ],
             ),
