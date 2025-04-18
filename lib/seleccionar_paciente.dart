@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'historial.dart';
-import 'chat.dart'; // Aseguramos que ChatPage esté importado
+import 'chat.dart';
 
 class SeleccionarPacientePage extends StatefulWidget {
   final String medicoId;
   final String medicoCorreo;
-  final bool isForChat; // Nuevo parámetro para indicar si es para el chat
+  final bool isForChat;
 
   const SeleccionarPacientePage({
     required this.medicoId,
     required this.medicoCorreo,
-    this.isForChat = false, // Por defecto, es para historial
+    this.isForChat = false,
     Key? key,
   }) : super(key: key);
 
@@ -49,19 +49,17 @@ class _SeleccionarPacientePageState extends State<SeleccionarPacientePage> {
 
   void _verHistorial(String correoPaciente) {
     if (widget.isForChat) {
-      // Si es para el chat, navegamos a ChatPage
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ChatPage(
             correo: widget.medicoCorreo,
             tipoUsuario: 'medico',
-            pacienteCorreo: correoPaciente, // Correo del paciente seleccionado
+            pacienteCorreo: correoPaciente,
           ),
         ),
       );
     } else {
-      // Si no es para el chat, navegamos a HistorialPage (comportamiento original)
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -77,67 +75,98 @@ class _SeleccionarPacientePageState extends State<SeleccionarPacientePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Definimos los colores para médicos, consistentes con InterfazPage
+    final colors = {
+      'gradientStart': Colors.red.shade800,
+      'gradientEnd': Colors.red.shade600,
+      'header': Colors.red.shade900,
+      'buttonBase': Colors.red.shade700,
+      'buttonHoverStart': Colors.red.shade600,
+      'buttonHoverEnd': Colors.red.shade400,
+    };
+
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Seleccionar Paciente',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.teal.shade50, Colors.teal.shade200],
+            colors: [colors['gradientStart']!, colors['gradientEnd']!],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : pacientes.isEmpty
-                      ? const Center(child: Text('No tienes pacientes asignados'))
-                      : _buildPacientesList(),
-            ),
-          ],
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(colors['header']!),
+              Expanded(
+                child: isLoading
+                    ? Center(child: CircularProgressIndicator(color: colors['header']!))
+                    : pacientes.isEmpty
+                        ? Center(
+                            child: Container(
+                              padding: const EdgeInsets.all(20),
+                              margin: const EdgeInsets.symmetric(horizontal: 20),
+                              decoration: BoxDecoration(
+                                color: colors['header']!.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: const Text(
+                                'No tienes pacientes asignados',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                        : _buildPacientesGrid(colors),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(Color headerColor) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
       decoration: BoxDecoration(
-        color: Colors.teal.shade700,
+        color: headerColor,
         borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
+          bottomLeft: Radius.circular(50),
+          bottomRight: Radius.circular(50),
         ),
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.person_search,
-            size: 60,
-            color: Colors.white,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              const CircleAvatar(
+                radius: 30,
+                backgroundColor: Colors.white,
+                child: Icon(
+                  Icons.person_search,
+                  size: 40,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(width: 40),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 15),
           const Text(
             "Seleccionar Paciente",
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
@@ -147,55 +176,95 @@ class _SeleccionarPacientePageState extends State<SeleccionarPacientePage> {
     );
   }
 
-  Widget _buildPacientesList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
+  Widget _buildPacientesGrid(Map<String, Color> colors) {
+    return GridView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 20,
+        mainAxisSpacing: 20,
+        childAspectRatio: 1,
+      ),
       itemCount: pacientes.length,
       itemBuilder: (context, index) {
         final paciente = pacientes[index];
-        return _buildPacienteCard(paciente);
+        return _buildPacienteButton(
+          nombre: paciente['nombre_completo'] ?? 'Sin nombre',
+          correo: paciente['correo'] ?? 'Sin correo',
+          colors: colors,
+          onTap: () => _verHistorial(paciente['correo']),
+        );
       },
     );
   }
 
-  Widget _buildPacienteCard(Map<String, dynamic> paciente) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.teal.shade200, Colors.teal.shade400],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  Widget _buildPacienteButton({
+    required String nombre,
+    required String correo,
+    required Map<String, Color> colors,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: colors['buttonBase'],
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            offset: Offset(0, 4),
-            blurRadius: 10,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(15),
+            onTap: onTap,
+            splashColor: colors['buttonHoverStart']!.withOpacity(0.3),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.person,
+                    size: 40,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    nombre,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    correo,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(15),
-        title: Text(
-          paciente['nombre_completo'] ?? 'Sin nombre',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            fontSize: 18,
-          ),
         ),
-        subtitle: Text(
-          paciente['correo'] ?? 'Sin correo',
-          style: const TextStyle(color: Colors.white70),
-        ),
-        leading: const Icon(
-          Icons.person,
-          color: Colors.white,
-          size: 30,
-        ),
-        onTap: () => _verHistorial(paciente['correo']),
       ),
     );
   }

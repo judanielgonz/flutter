@@ -22,10 +22,9 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    _notificacionesService.initialize(); // Inicializar las notificaciones
+    _notificacionesService.initialize();
   }
 
-  // Función para normalizar texto (eliminar acentos)
   String _normalize(String text) {
     return text
         .replaceAll('á', 'a')
@@ -50,17 +49,14 @@ class _LoginPageState extends State<LoginPage> {
       });
 
       if (response['success'] == true) {
-        // Normalizamos el tipoUsuario para manejar acentos
         final tipoUsuario = _normalize(response['tipoUsuario']);
         
-        // Enviar notificación de inicio de sesión exitoso
         await _notificacionesService.showNotification(
           '¡Bienvenido a SaludGest!',
           'Has iniciado sesión como $tipoUsuario.',
         );
 
         if (tipoUsuario == 'paciente' || tipoUsuario == 'medico') {
-          // Redirigimos a InterfazPage para pacientes y médicos, pasando el usuarioId
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -73,7 +69,6 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
         } else if (tipoUsuario == 'admin') {
-          // Redirigimos a RegistroMedicoPage para admin
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -107,7 +102,7 @@ class _LoginPageState extends State<LoginPage> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.teal.shade200, Colors.teal.shade600],
+            colors: [Colors.blue.shade600, Colors.red.shade600],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -136,30 +131,38 @@ class _LoginPageState extends State<LoginPage> {
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        const Text(
+                        Text(
                           "Iniciar Sesión",
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Colors.teal,
+                            color: Colors.blue.shade500,
                           ),
                         ),
                         const SizedBox(height: 20),
                         TextField(
                           controller: _correoController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: "Correo",
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.email),
+                            labelStyle: TextStyle(color: Colors.blue.shade500),
+                            border: const OutlineInputBorder(),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Colors.blue.shade500),
+                            ),
+                            prefixIcon: Icon(Icons.email, color: Colors.red.shade500),
                           ),
                         ),
                         const SizedBox(height: 20),
                         TextField(
                           controller: _contrasenaController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: "Contraseña",
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.lock),
+                            labelStyle: TextStyle(color: Colors.blue.shade500),
+                            border: const OutlineInputBorder(),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Colors.blue.shade500),
+                            ),
+                            prefixIcon: Icon(Icons.lock, color: Colors.red.shade500),
                           ),
                           obscureText: true,
                         ),
@@ -167,15 +170,15 @@ class _LoginPageState extends State<LoginPage> {
                         if (_errorMessage != null)
                           Text(
                             _errorMessage!,
-                            style: const TextStyle(color: Colors.red),
+                            style: TextStyle(color: Colors.red.shade500),
                           ),
                         const SizedBox(height: 20),
                         _isLoading
-                            ? const CircularProgressIndicator()
+                            ? CircularProgressIndicator(color: Colors.red.shade500)
                             : ElevatedButton(
                                 onPressed: _login,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal.shade700,
+                                  backgroundColor: Colors.blue.shade600,
                                   padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
@@ -194,9 +197,9 @@ class _LoginPageState extends State<LoginPage> {
                               MaterialPageRoute(builder: (context) => RegistroPage()),
                             );
                           },
-                          child: const Text(
+                          child: Text(
                             "¿No tienes cuenta? Regístrate",
-                            style: TextStyle(color: Colors.teal),
+                            style: TextStyle(color: Colors.red.shade500),
                           ),
                         ),
                       ],

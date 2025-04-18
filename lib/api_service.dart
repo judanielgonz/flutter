@@ -240,6 +240,54 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> eliminarDisponibilidad(Map<String, dynamic> data) async {
+  final url = Uri.parse('$baseUrl/api/pacientes/eliminar-disponibilidad');
+  final response = await http.post(
+    url,
+    headers: {'Content-Type': 'application/json'},
+    body: json.encode({
+      'correo': data['correo'],
+      'dia': data['dia'],
+      'horario': data['horario'],
+    }),
+  );
+  print('Solicitando eliminar disponibilidad a: $url');
+  print('Datos enviados: ${json.encode(data)}');
+  print('Respuesta del servidor: ${response.statusCode} - ${response.body}');
+  final responseBody = json.decode(response.body);
+  if (response.statusCode == 200) {
+    return responseBody;
+  } else {
+    throw Exception(responseBody['error'] ?? 'Error al eliminar la disponibilidad: ${response.body}');
+  }
+}
+
+// Actualizar disponibilidad
+Future<Map<String, dynamic>> actualizarDisponibilidad(Map<String, dynamic> data) async {
+  final url = Uri.parse('$baseUrl/api/pacientes/actualizar-disponibilidad');
+  final response = await http.post(
+    url,
+    headers: {'Content-Type': 'application/json'},
+    body: json.encode({
+      'correo': data['correo'],
+      'diaAntiguo': data['diaAntiguo'],
+      'horarioAntiguo': data['horarioAntiguo'],
+      'diaNuevo': data['diaNuevo'],
+      'horarioNuevo': data['horarioNuevo'],
+      'consultorio': data['consultorio'],
+    }),
+  );
+  print('Solicitando actualizar disponibilidad a: $url');
+  print('Datos enviados: ${json.encode(data)}');
+  print('Respuesta del servidor: ${response.statusCode} - ${response.body}');
+  final responseBody = json.decode(response.body);
+  if (response.statusCode == 200) {
+    return responseBody;
+  } else {
+    throw Exception(responseBody['error'] ?? 'Error al actualizar la disponibilidad: ${response.body}');
+  }
+}
+
   // Obtener historial médico por correo
   Future<List<dynamic>> getHistorialMedico(String correo) async {
     final url = Uri.parse('$baseUrl/api/historial/obtener-por-correo?correo=$correo');

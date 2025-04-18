@@ -41,7 +41,6 @@ class _HistorialPageState extends State<HistorialPage> {
   Future<void> _fetchHistorial() async {
     try {
       final historialData = await apiService.getHistorialMedico(widget.correo);
-      print('Historial recibido: $historialData'); // Para depurar
       setState(() {
         historial = historialData;
         isLoading = false;
@@ -155,6 +154,32 @@ class _HistorialPageState extends State<HistorialPage> {
     }
   }
 
+  Map<String, Color> _getColorsForRole() {
+    switch (widget.tipoUsuario) {
+      case 'medico':
+        return {
+          'header': Colors.red.shade600,
+          'headerGradient': Colors.red.shade400,
+          'accent': Colors.red.shade500,
+          'iconBackground': Colors.red.shade500,
+        };
+      case 'paciente':
+        return {
+          'header': Colors.blue.shade600,
+          'headerGradient': Colors.blue.shade400,
+          'accent': Colors.blue.shade500,
+          'iconBackground': Colors.blue.shade500,
+        };
+      default:
+        return {
+          'header': Colors.teal.shade600,
+          'headerGradient': Colors.teal.shade400,
+          'accent': Colors.teal.shade500,
+          'iconBackground': Colors.teal.shade500,
+        };
+    }
+  }
+
   void _mostrarDialogoAgregarEntrada() {
     if (widget.tipoUsuario == 'paciente') {
       _mostrarDialogoAgregarSintoma();
@@ -164,22 +189,23 @@ class _HistorialPageState extends State<HistorialPage> {
   }
 
   void _mostrarDialogoSeleccionTipo() {
+    final colors = _getColorsForRole();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Text(
           'Seleccionar Tipo de Entrada',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+          style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildDialogOption('Síntoma', () => _mostrarDialogoAgregarSintoma()),
-            _buildDialogOption('Diagnóstico', () => _mostrarDialogoAgregarDiagnostico()),
-            _buildDialogOption('Tratamiento', () => _mostrarDialogoAgregarTratamiento()),
-            _buildDialogOption('Medicamento', () => _mostrarDialogoAgregarMedicamento()),
-            _buildDialogOption('Subir Documento PDF', () => _subirDocumento()),
+            _buildDialogOption('Síntoma', () => _mostrarDialogoAgregarSintoma(), colors['accent']!),
+            _buildDialogOption('Diagnóstico', () => _mostrarDialogoAgregarDiagnostico(), colors['accent']!),
+            _buildDialogOption('Tratamiento', () => _mostrarDialogoAgregarTratamiento(), colors['accent']!),
+            _buildDialogOption('Medicamento', () => _mostrarDialogoAgregarMedicamento(), colors['accent']!),
+            _buildDialogOption('Subir Documento PDF', () => _subirDocumento(), colors['accent']!),
           ],
         ),
         actions: [
@@ -192,14 +218,14 @@ class _HistorialPageState extends State<HistorialPage> {
     );
   }
 
-  Widget _buildDialogOption(String title, VoidCallback onTap) {
+  Widget _buildDialogOption(String title, VoidCallback onTap, Color accentColor) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ListTile(
         title: Text(
           title,
-          style: const TextStyle(color: Colors.teal, fontWeight: FontWeight.w600),
+          style: TextStyle(color: accentColor, fontWeight: FontWeight.w600),
         ),
         onTap: () {
           Navigator.pop(context);
@@ -210,15 +236,16 @@ class _HistorialPageState extends State<HistorialPage> {
   }
 
   void _mostrarDialogoAgregarSintoma() {
+    final colors = _getColorsForRole();
     _sintomaController.clear();
     _mostrarDialogo(
       title: 'Agregar Síntoma',
       content: TextField(
         controller: _sintomaController,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Descripción del síntoma',
-          border: OutlineInputBorder(),
-          prefixIcon: Icon(Icons.sick, color: Colors.teal),
+          border: const OutlineInputBorder(),
+          prefixIcon: Icon(Icons.sick, color: colors['accent']),
         ),
         maxLines: 3,
       ),
@@ -231,19 +258,21 @@ class _HistorialPageState extends State<HistorialPage> {
         }
         _guardarEntrada('sintomas', {'descripcion': _sintomaController.text});
       },
+      accentColor: colors['accent']!,
     );
   }
 
   void _mostrarDialogoAgregarDiagnostico() {
+    final colors = _getColorsForRole();
     _diagnosticoController.clear();
     _mostrarDialogo(
       title: 'Agregar Diagnóstico',
       content: TextField(
         controller: _diagnosticoController,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Descripción del diagnóstico',
-          border: OutlineInputBorder(),
-          prefixIcon: Icon(Icons.medical_information, color: Colors.teal),
+          border: const OutlineInputBorder(),
+          prefixIcon: Icon(Icons.medical_information, color: colors['accent']),
         ),
         maxLines: 3,
       ),
@@ -256,19 +285,21 @@ class _HistorialPageState extends State<HistorialPage> {
         }
         _guardarEntrada('diagnosticos', {'descripcion': _diagnosticoController.text});
       },
+      accentColor: colors['accent']!,
     );
   }
 
   void _mostrarDialogoAgregarTratamiento() {
+    final colors = _getColorsForRole();
     _tratamientoController.clear();
     _mostrarDialogo(
       title: 'Agregar Tratamiento',
       content: TextField(
         controller: _tratamientoController,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Descripción del tratamiento',
-          border: OutlineInputBorder(),
-          prefixIcon: Icon(Icons.healing, color: Colors.teal),
+          border: const OutlineInputBorder(),
+          prefixIcon: Icon(Icons.healing, color: colors['accent']),
         ),
         maxLines: 3,
       ),
@@ -281,10 +312,12 @@ class _HistorialPageState extends State<HistorialPage> {
         }
         _guardarEntrada('tratamientos', {'descripcion': _tratamientoController.text});
       },
+      accentColor: colors['accent']!,
     );
   }
 
   void _mostrarDialogoAgregarMedicamento() {
+    final colors = _getColorsForRole();
     _medicamentoNombreController.clear();
     _medicamentoDosisController.clear();
     _medicamentoFrecuenciaController.clear();
@@ -296,28 +329,28 @@ class _HistorialPageState extends State<HistorialPage> {
           children: [
             TextField(
               controller: _medicamentoNombreController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Nombre del medicamento',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.medication, color: Colors.teal),
+                border: const OutlineInputBorder(),
+                prefixIcon: Icon(Icons.medication, color: colors['accent']),
               ),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: _medicamentoDosisController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Dosis',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.local_pharmacy, color: Colors.teal),
+                border: const OutlineInputBorder(),
+                prefixIcon: Icon(Icons.local_pharmacy, color: colors['accent']),
               ),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: _medicamentoFrecuenciaController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Frecuencia',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.schedule, color: Colors.teal),
+                border: const OutlineInputBorder(),
+                prefixIcon: Icon(Icons.schedule, color: colors['accent']),
               ),
             ),
           ],
@@ -339,17 +372,23 @@ class _HistorialPageState extends State<HistorialPage> {
           'fecha_inicio': DateTime.now().toIso8601String(),
         });
       },
+      accentColor: colors['accent']!,
     );
   }
 
-  void _mostrarDialogo({required String title, required Widget content, required VoidCallback onSave}) {
+  void _mostrarDialogo({
+    required String title,
+    required Widget content,
+    required VoidCallback onSave,
+    required Color accentColor,
+  }) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+          style: TextStyle(fontWeight: FontWeight.bold, color: accentColor),
         ),
         content: content,
         actions: [
@@ -360,7 +399,7 @@ class _HistorialPageState extends State<HistorialPage> {
           ElevatedButton(
             onPressed: onSave,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
+              backgroundColor: accentColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Guardar', style: TextStyle(color: Colors.white)),
@@ -372,30 +411,31 @@ class _HistorialPageState extends State<HistorialPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.white, Colors.tealAccent],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: Column(
+    final colors = _getColorsForRole();
+    return DefaultTabController(
+      length: 6,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
           children: [
-            _buildHeader(),
+            _buildHeader(colors),
+            TabBar(
+              isScrollable: true,
+              indicatorColor: colors['accent'],
+              labelColor: colors['accent'],
+              unselectedLabelColor: Colors.grey,
+              tabs: const [
+                Tab(text: 'Síntomas'),
+                Tab(text: 'Diagnósticos'),
+                Tab(text: 'Tratamientos'),
+                Tab(text: 'Medicamentos'),
+                Tab(text: 'Análisis'),
+                Tab(text: 'Documentos'),
+              ],
+            ),
             Expanded(
               child: isLoading
-                  ? const Center(child: CircularProgressIndicator(color: Colors.teal))
+                  ? Center(child: CircularProgressIndicator(color: colors['accent']))
                   : historial.isEmpty
                       ? const Center(
                           child: Text(
@@ -403,259 +443,214 @@ class _HistorialPageState extends State<HistorialPage> {
                             style: TextStyle(fontSize: 18, color: Colors.grey),
                           ),
                         )
-                      : _buildHistorialList(),
+                      : TabBarView(
+                          children: [
+                            _buildTabContent('sintomas', Icons.sick, colors),
+                            _buildTabContent('diagnosticos', Icons.medical_information, colors),
+                            _buildTabContent('tratamientos', Icons.healing, colors),
+                            _buildTabContent('medicamentos', Icons.medication, colors),
+                            _buildTabContent('resultados_analisis', Icons.analytics, colors),
+                            _buildDocumentTab('documentos', Icons.picture_as_pdf, colors),
+                          ],
+                        ),
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _mostrarDialogoAgregarEntrada,
-        backgroundColor: Colors.teal.shade700,
-        child: const Icon(Icons.add, color: Colors.white, size: 30),
-        elevation: 6,
-        tooltip: 'Agregar entrada',
+        floatingActionButton: FloatingActionButton(
+          onPressed: _mostrarDialogoAgregarEntrada,
+          backgroundColor: colors['accent'],
+          child: const Icon(Icons.add, color: Colors.white, size: 30),
+          elevation: 6,
+          tooltip: 'Agregar entrada',
+        ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(Map<String, Color> colors) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.teal.shade700,
+        gradient: LinearGradient(
+          colors: [colors['header']!, colors['headerGradient']!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(40),
-          bottomRight: Radius.circular(40),
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.medical_services,
-            size: 50,
-            color: Colors.white,
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            "Historial Médico",
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              shadows: [
-                Shadow(
-                  color: Colors.black26,
-                  offset: Offset(2, 2),
-                  blurRadius: 4,
-                ),
-              ],
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            "Paciente: ${widget.correo}",
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.white70,
-              fontStyle: FontStyle.italic,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHistorialList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: historial.length,
-      itemBuilder: (context, index) {
-        final entrada = historial[index];
-        return _buildHistorialCard(entrada);
-      },
-    );
-  }
-
-  Widget _buildHistorialCard(Map<String, dynamic> entrada) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 10),
-      elevation: 5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Colors.white, Colors.tealAccent],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Column(
+      child: SafeArea(
+        child: Row(
           children: [
-            if (entrada['sintomas']?.isNotEmpty ?? false) ...[
-              _buildCategorySection('Síntomas', entrada['sintomas'], Icons.sick, Colors.redAccent),
-            ],
-            if (entrada['diagnosticos']?.isNotEmpty ?? false) ...[
-              _buildCategorySection('Diagnósticos', entrada['diagnosticos'], Icons.medical_information, Colors.blueAccent),
-            ],
-            if (entrada['tratamientos']?.isNotEmpty ?? false) ...[
-              _buildCategorySection('Tratamientos', entrada['tratamientos'], Icons.healing, Colors.green),
-            ],
-            if (entrada['medicamentos']?.isNotEmpty ?? false) ...[
-              _buildCategorySection('Medicamentos', entrada['medicamentos'], Icons.medication, Colors.orange),
-            ],
-            if (entrada['resultados_analisis']?.isNotEmpty ?? false) ...[
-              _buildCategorySection('Resultados de Análisis', entrada['resultados_analisis'], Icons.analytics, Colors.purple),
-            ],
-            if (entrada['documentos']?.isNotEmpty ?? false) ...[
-              _buildDocumentSection('Documentos', entrada['documentos'], entrada['_id'], Icons.picture_as_pdf, Colors.teal),
-            ],
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+              onPressed: () => Navigator.pop(context),
+            ),
+            const SizedBox(width: 8),
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.white,
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: colors['iconBackground'],
+                child: Icon(
+                  widget.tipoUsuario == 'medico' ? Icons.medical_services : Icons.person,
+                  size: 24,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Historial Médico',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    widget.correo,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white70,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCategorySection(String title, List<dynamic> entries, IconData icon, Color color) {
-    return ExpansionTile(
-      leading: Icon(icon, color: color, size: 30),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 18,
-          color: color,
-        ),
-      ),
-      children: entries.map((entry) {
-        String detalle = '';
-        String fecha = entry['fecha'] ?? entry['fecha_inicio'] ?? 'Sin fecha';
+  Widget _buildTabContent(String key, IconData icon, Map<String, Color> colors) {
+    List<dynamic> entries = [];
+    for (var entry in historial) {
+      if (entry[key]?.isNotEmpty ?? false) {
+        entries.addAll(entry[key].map((e) => {...e, 'historialId': entry['_id']}));
+      }
+    }
 
-        if (title == 'Síntomas' || title == 'Diagnósticos' || title == 'Tratamientos') {
-          detalle = entry['descripcion'] ?? 'Sin descripción';
-        } else if (title == 'Medicamentos') {
-          detalle = '${entry['nombre']} - ${entry['dosis']} (${entry['frecuencia']})';
-        } else if (title == 'Resultados de Análisis') {
-          detalle = entry['resultados'].toString();
-        }
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+    return entries.isEmpty
+        ? const Center(
+            child: Text(
+              'No hay registros',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, color: color, size: 24),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        detalle,
-                        style: const TextStyle(fontSize: 16, color: Colors.black87),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        'Fecha: $fecha',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: entries.length,
+            itemBuilder: (context, index) {
+              final entry = entries[index];
+              String detalle = '';
+              String fecha = entry['fecha'] ?? entry['fecha_inicio'] ?? 'Sin fecha';
+
+              if (key == 'sintomas' || key == 'diagnosticos' || key == 'tratamientos') {
+                detalle = entry['descripcion'] ?? 'Sin descripción';
+              } else if (key == 'medicamentos') {
+                detalle = '${entry['nombre']} - ${entry['dosis']} (${entry['frecuencia']})';
+              } else if (key == 'resultados_analisis') {
+                detalle = entry['resultados'].toString();
+              }
+
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                elevation: 3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: colors['accent']!),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: ListTile(
+                    leading: Icon(icon, color: colors['accent'], size: 30),
+                    title: Text(
+                      detalle,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+                    ),
+                    subtitle: Text(
+                      'Fecha: $fecha',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
+              );
+            },
+          );
   }
 
-  Widget _buildDocumentSection(String title, List<dynamic> documents, String historialId, IconData icon, Color color) {
-    return ExpansionTile(
-      leading: Icon(icon, color: color, size: 30),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 18,
-          color: color,
-        ),
-      ),
-      children: documents.map((doc) {
-        String documentoId = doc['_id'] ?? 'Sin ID';
-        String fecha = doc['fecha'] ?? 'Sin fecha';
+  Widget _buildDocumentTab(String key, IconData icon, Map<String, Color> colors) {
+    List<dynamic> documents = [];
+    for (var entry in historial) {
+      if (entry[key]?.isNotEmpty ?? false) {
+        documents.addAll(entry[key].map((e) => {...e, 'historialId': entry['_id']}));
+      }
+    }
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+    return documents.isEmpty
+        ? const Center(
+            child: Text(
+              'No hay documentos',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, color: color, size: 24),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Documento PDF',
-                        style: TextStyle(fontSize: 16, color: Colors.black87),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        'Fecha: $fecha',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: documents.length,
+            itemBuilder: (context, index) {
+              final doc = documents[index];
+              String documentoId = doc['_id'] ?? 'Sin ID';
+              String fecha = doc['fecha'] ?? 'Sin fecha';
+              String historialId = doc['historialId'] ?? '';
+
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                elevation: 3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: colors['accent']!),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: ListTile(
+                    leading: Icon(icon, color: colors['accent'], size: 30),
+                    title: const Text(
+                      'Documento PDF',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+                    ),
+                    subtitle: Text(
+                      'Fecha: $fecha',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    trailing: IconButton(
+                      icon: Icon(Icons.download, color: colors['accent']),
+                      onPressed: () => _descargarDocumento(historialId, documentoId),
+                      tooltip: 'Descargar y abrir PDF',
+                    ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.download, color: Colors.teal),
-                  onPressed: () => _descargarDocumento(historialId, documentoId),
-                  tooltip: 'Descargar y abrir PDF',
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
+              );
+            },
+          );
   }
 
   @override

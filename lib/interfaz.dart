@@ -34,6 +34,7 @@ class InterfazPage extends StatefulWidget {
 
 class _InterfazPageState extends State<InterfazPage> {
   String? _medicoAsignado;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -79,67 +80,149 @@ class _InterfazPageState extends State<InterfazPage> {
     return false;
   }
 
+  Map<String, Color> _getColorsForRole() {
+    switch (widget.tipoUsuario) {
+      case 'medico':
+        return {
+          'gradientStart': Colors.red.shade800,
+          'gradientEnd': Colors.red.shade600,
+          'header': Colors.red.shade900,
+          'buttonBase': Colors.red.shade700,
+          'buttonHoverStart': Colors.red.shade600,
+          'buttonHoverEnd': Colors.red.shade400,
+          'bottomNav': Colors.red.shade800,
+        };
+      case 'paciente':
+        return {
+          'gradientStart': Colors.blue.shade800,
+          'gradientEnd': Colors.blue.shade600,
+          'header': Colors.blue.shade900,
+          'buttonBase': Colors.blue.shade700,
+          'buttonHoverStart': Colors.blue.shade600,
+          'buttonHoverEnd': Colors.blue.shade400,
+          'bottomNav': Colors.blue.shade800,
+        };
+      default:
+        return {
+          'gradientStart': Colors.teal.shade600,
+          'gradientEnd': Colors.teal.shade400,
+          'header': Colors.teal.shade700,
+          'buttonBase': Colors.teal.shade500,
+          'buttonHoverStart': Colors.teal.shade400,
+          'buttonHoverEnd': Colors.teal.shade200,
+          'bottomNav': Colors.teal.shade600,
+        };
+    }
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    switch (index) {
+      case 0:
+        break;
+      case 1:
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => NotificacionesPage()),
+        );
+        break;
+      case 2:
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ConfiguracionPage()),
+        );
+        break;
+      case 3:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colors = _getColorsForRole();
+
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginPage()),
-              );
-            },
-            tooltip: 'Cerrar sesión',
-          ),
-        ],
-      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.teal.shade50, Colors.teal.shade200],
+            colors: [colors['gradientStart']!, colors['gradientEnd']!],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildGrid(context),
-          ],
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(colors['header']!),
+              _buildOptionsGrid(context, colors),
+            ],
+          ),
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: colors['bottomNav'],
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white70,
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Inicio',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Notificaciones',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Configuración',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.logout),
+            label: 'Cerrar Sesión',
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(Color headerColor) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
       decoration: BoxDecoration(
-        color: Colors.teal.shade700,
+        color: headerColor,
         borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
+          bottomLeft: Radius.circular(50),
+          bottomRight: Radius.circular(50),
         ),
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.health_and_safety,
-            size: 80,
-            color: Colors.white,
+          const CircleAvatar(
+            radius: 40,
+            backgroundColor: Colors.white,
+            child: Icon(
+              Icons.person,
+              size: 50,
+              color: Colors.grey,
+            ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 15),
           const Text(
             "Bienvenido a SaludGest",
             style: TextStyle(
-              fontSize: 26,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
@@ -152,230 +235,282 @@ class _InterfazPageState extends State<InterfazPage> {
               color: Colors.white70,
             ),
           ),
+          Text(
+            "Rol: ${widget.tipoUsuario}",
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.white60,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildGrid(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 20,
-          mainAxisSpacing: 20,
-          children: [
-            // Opciones para Paciente
-            if (widget.tipoUsuario == 'paciente') ...[
-              if (_medicoAsignado == null)
-                _buildGridButton(
-                  context,
-                  "Asignar Médico",
-                  AsignarMedicoPage(pacienteCorreo: widget.correo),
-                  Icons.person_add_alt_1,
-                  onTap: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AsignarMedicoPage(pacienteCorreo: widget.correo),
-                      ),
-                    );
-                    if (result == true) {
-                      await _fetchUsuarioData();
-                    }
-                  },
+  Widget _buildOptionsGrid(BuildContext context, Map<String, Color> colors) {
+    List<Map<String, dynamic>> options = [];
+
+    if (widget.tipoUsuario == 'paciente') {
+      options = [
+        if (_medicoAsignado == null)
+          {
+            'title': 'Asignar Médico',
+            'icon': Icons.person_add_alt_1,
+            'onTap': () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AsignarMedicoPage(pacienteCorreo: widget.correo),
                 ),
-              _buildGridButton(
-                context,
-                "Agendar Cita",
-                agendarCita.AgendarCitaPage(pacienteCorreo: widget.correo),
-                Icons.calendar_today,
+              );
+              if (result == true) {
+                await _fetchUsuarioData();
+              }
+            },
+          },
+        {
+          'title': 'Agendar Cita',
+          'icon': Icons.calendar_today,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => agendarCita.AgendarCitaPage(pacienteCorreo: widget.correo),
               ),
-              _buildGridButton(
-                context,
-                "Mis Citas",
-                CitasPage(correo: widget.correo, tipoUsuario: widget.tipoUsuario),
-                Icons.event,
+            );
+          },
+        },
+        {
+          'title': 'Mis Citas',
+          'icon': Icons.event,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CitasPage(correo: widget.correo, tipoUsuario: widget.tipoUsuario),
               ),
-              _buildGridButton(
+            );
+          },
+        },
+        {
+          'title': 'Chat',
+          'icon': Icons.chat,
+          'onTap': () async {
+            if (await _checkMedicoAsignado(context)) {
+              Navigator.push(
                 context,
-                "Chat",
-                null,
-                Icons.chat,
-                onTap: () async {
-                  if (await _checkMedicoAsignado(context)) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ChatPage(
-                          correo: widget.correo,
-                          tipoUsuario: widget.tipoUsuario,
-                          medicoAsignado: _medicoAsignado,
-                        ),
-                      ),
-                    );
-                  }
-                },
-              ),
-              _buildGridButton(
-                context,
-                "Historial",
-                HistorialPage(
+                MaterialPageRoute(
+                  builder: (context) => ChatPage(
+                    correo: widget.correo,
+                    tipoUsuario: widget.tipoUsuario,
+                    medicoAsignado: _medicoAsignado,
+                  ),
+                ),
+              );
+            }
+          },
+        },
+        {
+          'title': 'Historial',
+          'icon': Icons.history,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HistorialPage(
                   correo: widget.correo,
                   tipoUsuario: widget.tipoUsuario,
                   medicoCorreo: null,
                 ),
-                Icons.history,
               ),
-            ],
+            );
+          },
+        },
+      ];
+    }
 
-            // Opciones para Médico
-            if (widget.tipoUsuario == 'medico') ...[
-              _buildGridButton(
-                context,
-                "Mis Citas",
-                CitasPage(correo: widget.correo, tipoUsuario: widget.tipoUsuario),
-                Icons.event,
+    if (widget.tipoUsuario == 'medico') {
+      options = [
+        {
+          'title': 'Mis Citas',
+          'icon': Icons.event,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CitasPage(correo: widget.correo, tipoUsuario: widget.tipoUsuario),
               ),
-              _buildGridButton(
-                context,
-                "Registrar Disponibilidad",
-                RegistrarDisponibilidadPage(correo: widget.correo),
-                Icons.schedule,
+            );
+          },
+        },
+        {
+          'title': 'Registrar Disponibilidad',
+          'icon': Icons.schedule,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RegistrarDisponibilidadPage(correo: widget.correo),
               ),
-              _buildGridButton(
-                context,
-                "Gestionar Paciente",
-                GestionarPage(
+            );
+          },
+        },
+        {
+          'title': 'Gestionar Paciente',
+          'icon': Icons.person_add,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GestionarPage(
                   medicoId: widget.usuarioId,
                   medicoCorreo: widget.correo,
                 ),
-                Icons.person_add,
               ),
-              _buildGridButton(
-                context,
-                "Historial de Paciente",
-                null,
-                Icons.history,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SeleccionarPacientePage(
-                        medicoId: widget.usuarioId!,
-                        medicoCorreo: widget.correo,
-                      ),
-                    ),
-                  );
-                },
+            );
+          },
+        },
+        {
+          'title': 'Historial de Paciente',
+          'icon': Icons.history,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SeleccionarPacientePage(
+                  medicoId: widget.usuarioId!,
+                  medicoCorreo: widget.correo,
+                ),
               ),
-              _buildGridButton(
-                context,
-                "Chat",
-                null,
-                Icons.chat,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SeleccionarPacientePage(
-                        medicoId: widget.usuarioId!,
-                        medicoCorreo: widget.correo,
-                        isForChat: true,
-                      ),
-                    ),
-                  );
-                },
+            );
+          },
+        },
+        {
+          'title': 'Chat',
+          'icon': Icons.chat,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SeleccionarPacientePage(
+                  medicoId: widget.usuarioId!,
+                  medicoCorreo: widget.correo,
+                  isForChat: true,
+                ),
               ),
-            ],
+            );
+          },
+        },
+      ];
+    }
 
-            // Opciones para Admin y Secretario
-            if (widget.tipoUsuario == 'admin' || widget.tipoUsuario == 'secretario') ...[
-              _buildGridButton(
-                context,
-                "Gestionar Paciente",
-                GestionarPage(
+    if (widget.tipoUsuario == 'admin' || widget.tipoUsuario == 'secretario') {
+      options = [
+        {
+          'title': 'Gestionar Paciente',
+          'icon': Icons.person_add,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GestionarPage(
                   medicoId: widget.usuarioId,
                   medicoCorreo: widget.correo,
                 ),
-                Icons.person_add,
               ),
-              if (widget.tipoUsuario == 'admin')
-                _buildGridButton(
-                  context,
-                  "Registrar Médico",
-                  RegistroMedicoPage(),
-                  Icons.medical_services,
-                ),
-            ],
+            );
+          },
+        },
+      ];
+      if (widget.tipoUsuario == 'admin') {
+        options.add({
+          'title': 'Registrar Médico',
+          'icon': Icons.medical_services,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => RegistroMedicoPage()),
+            );
+          },
+        });
+      }
+    }
 
-            // Opciones comunes para todos los usuarios
-            _buildGridButton(
-              context,
-              "Notificaciones",
-              NotificacionesPage(),
-              Icons.notifications,
-            ),
-            _buildGridButton(
-              context,
-              "Configuración",
-              ConfiguracionPage(),
-              Icons.settings,
-            ),
-          ],
+    return Expanded(
+      child: GridView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 20,
+          mainAxisSpacing: 20,
+          childAspectRatio: 1,
         ),
+        itemCount: options.length,
+        itemBuilder: (context, index) {
+          final option = options[index];
+          return _buildModernButton(
+            title: option['title'],
+            icon: option['icon'],
+            onTap: option['onTap'],
+            colors: colors,
+          );
+        },
       ),
     );
   }
 
-  Widget _buildGridButton(BuildContext context, String text, Widget? page, IconData icon, {VoidCallback? onTap}) {
+  Widget _buildModernButton({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+    required Map<String, Color> colors,
+  }) {
     return GestureDetector(
-      onTap: onTap ?? () {
-        if (page != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => page),
-          );
-        }
-      },
-      child: Container(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.teal.shade200, Colors.teal.shade400],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: const [
+          color: colors['buttonBase'],
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
             BoxShadow(
-              color: Colors.black12,
-              offset: Offset(0, 4),
+              color: Colors.black.withOpacity(0.2),
               blurRadius: 10,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(25),
-                child: Icon(icon, size: 50, color: Colors.white),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(15),
+            onTap: onTap,
+            splashColor: colors['buttonHoverStart']!.withOpacity(0.3),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
               ),
-              Positioned(
-                bottom: 25,
-                child: Text(
-                  text,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 40,
                     color: Colors.white,
                   ),
-                ),
+                  const SizedBox(height: 10),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
