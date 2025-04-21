@@ -23,6 +23,7 @@ class HistorialPage extends StatefulWidget {
 class _HistorialPageState extends State<HistorialPage> {
   List<dynamic> historial = [];
   bool isLoading = true;
+  bool isGeneratingDiagnosis = false; // Nueva variable para controlar la animación de carga
   final ApiService apiService = ApiService();
 
   final TextEditingController _sintomaController = TextEditingController();
@@ -31,6 +32,7 @@ class _HistorialPageState extends State<HistorialPage> {
   final TextEditingController _medicamentoNombreController = TextEditingController();
   final TextEditingController _medicamentoDosisController = TextEditingController();
   final TextEditingController _medicamentoFrecuenciaController = TextEditingController();
+  final TextEditingController _sintomasParaDiagnosticoController = TextEditingController();
 
   @override
   void initState() {
@@ -68,10 +70,8 @@ class _HistorialPageState extends State<HistorialPage> {
       await apiService.guardarEntradaHistorial(
         correoRegistrador,
         tipo,
-        {
-          ...datos,
-          'pacienteCorreo': widget.correo,
-        },
+        widget.correo,
+        datos,
       );
       await _fetchHistorial();
       Navigator.pop(context);
@@ -154,6 +154,132 @@ class _HistorialPageState extends State<HistorialPage> {
     }
   }
 
+  Future<void> _generarDiagnostico(String sintomasText) async {
+    try {
+      if (sintomasText.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No hay síntomas para analizar'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
+      // Mostrar animación de carga
+      setState(() {
+        isGeneratingDiagnosis = true;
+      });
+      showDialog(
+        context: context,
+        barrierDismissible: false, // Evitar que el usuario cierre el diálogo mientras carga
+        builder: (context) => AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: _getColorsForRole()['accent']),
+              const SizedBox(height: 16),
+              const Text('Generando diagnóstico...'),
+            ],
+          ),
+        ),
+      );
+
+      // Generar el diagnóstico
+      final diagnosticoData = await apiService.generarDiagnostico(sintomasText);
+
+      // Cerrar el diálogo de carga
+      Navigator.pop(context);
+      setState(() {
+        isGeneratingDiagnosis = false;
+      });
+
+      // Mostrar el diagnóstico generado
+      _mostrarDialogoDiagnostico(diagnosticoData);
+    } catch (e) {
+      Navigator.pop(context); // Cerrar el diálogo de carga en caso de error
+      setState(() {
+        isGeneratingDiagnosis = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al generar diagnóstico: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  void _mostrarDialogoDiagnostico(Map<String, dynamic> diagnosticoData) {
+    final colors = _getColorsForRole();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Text(
+          'Diagnóstico Generado por IA',
+          style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Síntomas Detectados:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
+              ),
+              const SizedBox(height: 5),
+              ...diagnosticoData['symptoms'].map<Widget>((sintoma) => Text('- $sintoma')).toList(),
+              const SizedBox(height: 10),
+              Text(
+                'Posibles Diagnósticos:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
+              ),
+              const SizedBox(height: 5),
+              ...diagnosticoData['possibleDiagnoses'].map<Widget>((diag) => Text(
+                  '- ${diag['diagnosis']} (${(diag['probability'] * 100).toStringAsFixed(0)}%)')),
+              const SizedBox(height: 10),
+              Text(
+                'Diagnóstico Principal:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
+              ),
+              const SizedBox(height: 5),
+              Text(diagnosticoData['diagnosis']),
+              const SizedBox(height: 10),
+              Text(
+                'Recomendaciones:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
+              ),
+              const SizedBox(height: 5),
+              Text(diagnosticoData['treatment']),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar', style: TextStyle(color: Colors.grey)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _extraerSintomasDelHistorial() {
+    List<String> sintomas = [];
+    for (var entry in historial) {
+      if (entry['sintomas']?.isNotEmpty ?? false) {
+        for (var sintoma in entry['sintomas']) {
+          if (sintoma['descripcion'] != null && sintoma['descripcion'].isNotEmpty) {
+            sintomas.add(sintoma['descripcion']);
+          }
+        }
+      }
+    }
+    return sintomas.isNotEmpty ? 'Paciente con ${sintomas.join(", ")}.' : '';
+  }
+
   Map<String, Color> _getColorsForRole() {
     switch (widget.tipoUsuario) {
       case 'medico':
@@ -206,6 +332,7 @@ class _HistorialPageState extends State<HistorialPage> {
             _buildDialogOption('Tratamiento', () => _mostrarDialogoAgregarTratamiento(), colors['accent']!),
             _buildDialogOption('Medicamento', () => _mostrarDialogoAgregarMedicamento(), colors['accent']!),
             _buildDialogOption('Subir Documento PDF', () => _subirDocumento(), colors['accent']!),
+            _buildDialogOption('Generar Diagnóstico con IA', () => _mostrarDialogoSeleccionMetodoDiagnostico(), colors['accent']!),
           ],
         ),
         actions: [
@@ -216,6 +343,48 @@ class _HistorialPageState extends State<HistorialPage> {
         ],
       ),
     );
+  }
+
+  void _mostrarDialogoSeleccionMetodoDiagnostico() {
+    final colors = _getColorsForRole();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Text(
+          'Seleccionar Método',
+          style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildDialogOption('Escribir Síntomas', () => _mostrarDialogoEscribirSintomas(), colors['accent']!),
+            _buildDialogOption('Usar Síntomas del Historial', () => _usarSintomasDelHistorial(), colors['accent']!),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _usarSintomasDelHistorial() {
+    final sintomasText = _extraerSintomasDelHistorial();
+    if (sintomasText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se encontraron síntomas en el historial'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      Navigator.pop(context);
+      return;
+    }
+    _generarDiagnostico(sintomasText);
   }
 
   Widget _buildDialogOption(String title, VoidCallback onTap, Color accentColor) {
@@ -376,6 +545,25 @@ class _HistorialPageState extends State<HistorialPage> {
     );
   }
 
+  void _mostrarDialogoEscribirSintomas() {
+    final colors = _getColorsForRole();
+    _sintomasParaDiagnosticoController.clear();
+    _mostrarDialogo(
+      title: 'Generar Diagnóstico con IA',
+      content: TextField(
+        controller: _sintomasParaDiagnosticoController,
+        decoration: InputDecoration(
+          labelText: 'Describe los síntomas del paciente',
+          border: const OutlineInputBorder(),
+          prefixIcon: Icon(Icons.analytics, color: colors['accent']),
+        ),
+        maxLines: 3,
+      ),
+      onSave: () => _generarDiagnostico(_sintomasParaDiagnosticoController.text),
+      accentColor: colors['accent']!,
+    );
+  }
+
   void _mostrarDialogo({
     required String title,
     required Widget content,
@@ -402,7 +590,7 @@ class _HistorialPageState extends State<HistorialPage> {
               backgroundColor: accentColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Guardar', style: TextStyle(color: Colors.white)),
+            child: const Text('Diagnosticar', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -661,6 +849,7 @@ class _HistorialPageState extends State<HistorialPage> {
     _medicamentoNombreController.dispose();
     _medicamentoDosisController.dispose();
     _medicamentoFrecuenciaController.dispose();
+    _sintomasParaDiagnosticoController.dispose();
     super.dispose();
   }
 }

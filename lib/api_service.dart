@@ -112,7 +112,7 @@ class ApiService {
         'correo': data['correo'],
         'dia': data['dia'],
         'horario': data['horario'],
-        'consultorio': data['consultorio'], // Añadimos el campo consultorio
+        'consultorio': data['consultorio'],
       }),
     );
     print('Solicitando registrar disponibilidad a: $url');
@@ -241,52 +241,52 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> eliminarDisponibilidad(Map<String, dynamic> data) async {
-  final url = Uri.parse('$baseUrl/api/pacientes/eliminar-disponibilidad');
-  final response = await http.post(
-    url,
-    headers: {'Content-Type': 'application/json'},
-    body: json.encode({
-      'correo': data['correo'],
-      'dia': data['dia'],
-      'horario': data['horario'],
-    }),
-  );
-  print('Solicitando eliminar disponibilidad a: $url');
-  print('Datos enviados: ${json.encode(data)}');
-  print('Respuesta del servidor: ${response.statusCode} - ${response.body}');
-  final responseBody = json.decode(response.body);
-  if (response.statusCode == 200) {
-    return responseBody;
-  } else {
-    throw Exception(responseBody['error'] ?? 'Error al eliminar la disponibilidad: ${response.body}');
+    final url = Uri.parse('$baseUrl/api/pacientes/eliminar-disponibilidad');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'correo': data['correo'],
+        'dia': data['dia'],
+        'horario': data['horario'],
+      }),
+    );
+    print(' Solicitando eliminar disponibilidad a: $url');
+    print('Datos enviados: ${json.encode(data)}');
+    print('Respuesta del servidor: ${response.statusCode} - ${response.body}');
+    final responseBody = json.decode(response.body);
+    if (response.statusCode == 200) {
+      return responseBody;
+    } else {
+      throw Exception(responseBody['error'] ?? 'Error al eliminar la disponibilidad: ${response.body}');
+    }
   }
-}
 
-// Actualizar disponibilidad
-Future<Map<String, dynamic>> actualizarDisponibilidad(Map<String, dynamic> data) async {
-  final url = Uri.parse('$baseUrl/api/pacientes/actualizar-disponibilidad');
-  final response = await http.post(
-    url,
-    headers: {'Content-Type': 'application/json'},
-    body: json.encode({
-      'correo': data['correo'],
-      'diaAntiguo': data['diaAntiguo'],
-      'horarioAntiguo': data['horarioAntiguo'],
-      'diaNuevo': data['diaNuevo'],
-      'horarioNuevo': data['horarioNuevo'],
-      'consultorio': data['consultorio'],
-    }),
-  );
-  print('Solicitando actualizar disponibilidad a: $url');
-  print('Datos enviados: ${json.encode(data)}');
-  print('Respuesta del servidor: ${response.statusCode} - ${response.body}');
-  final responseBody = json.decode(response.body);
-  if (response.statusCode == 200) {
-    return responseBody;
-  } else {
-    throw Exception(responseBody['error'] ?? 'Error al actualizar la disponibilidad: ${response.body}');
+  // Actualizar disponibilidad
+  Future<Map<String, dynamic>> actualizarDisponibilidad(Map<String, dynamic> data) async {
+    final url = Uri.parse('$baseUrl/api/pacientes/actualizar-disponibilidad');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'correo': data['correo'],
+        'diaAntiguo': data['diaAntiguo'],
+        'horarioAntiguo': data['horarioAntiguo'],
+        'diaNuevo': data['diaNuevo'],
+        'horarioNuevo': data['horarioNuevo'],
+        'consultorio': data['consultorio'],
+      }),
+    );
+    print('Solicitando actualizar disponibilidad a: $url');
+    print('Datos enviados: ${json.encode(data)}');
+    print('Respuesta del servidor: ${response.statusCode} - ${response.body}');
+    final responseBody = json.decode(response.body);
+    if (response.statusCode == 200) {
+      return responseBody;
+    } else {
+      throw Exception(responseBody['error'] ?? 'Error al actualizar la disponibilidad: ${response.body}');
+    }
   }
-}
 
   // Obtener historial médico por correo
   Future<List<dynamic>> getHistorialMedico(String correo) async {
@@ -308,7 +308,7 @@ Future<Map<String, dynamic>> actualizarDisponibilidad(Map<String, dynamic> data)
 
   // Guardar una entrada en el historial médico
   Future<Map<String, dynamic>> guardarEntradaHistorial(
-      String correoRegistrador, String tipo, Map<String, dynamic> datos) async {
+      String correoRegistrador, String tipo, String pacienteCorreo, Map<String, dynamic> datos) async {
     final url = Uri.parse('$baseUrl/api/historial/guardar-entrada');
     final response = await http.post(
       url,
@@ -316,10 +316,17 @@ Future<Map<String, dynamic>> actualizarDisponibilidad(Map<String, dynamic> data)
       body: json.encode({
         'correo': correoRegistrador,
         'tipo': tipo,
+        'pacienteCorreo': pacienteCorreo,
         'datos': datos,
       }),
     );
     print('Solicitando guardar entrada en historial a: $url');
+    print('Datos enviados: ${json.encode({
+      'correo': correoRegistrador,
+      'tipo': tipo,
+      'pacienteCorreo': pacienteCorreo,
+      'datos': datos,
+    })}');
     print('Respuesta del servidor (guardar entrada): ${response.statusCode} - ${response.body}');
     final responseBody = json.decode(response.body);
     if (response.statusCode == 200 && responseBody['success'] == true) {
@@ -354,7 +361,7 @@ Future<Map<String, dynamic>> actualizarDisponibilidad(Map<String, dynamic> data)
     if (response.statusCode == 200) {
       final decoded = jsonDecode(responseBody);
       if (decoded['success'] == true) {
-        return decoded;
+        return decoded; // Ahora incluye extractedData con diagnósticos, tratamientos y resultados
       } else {
         throw Exception(decoded['error'] ?? 'Error al subir el documento');
       }
@@ -381,6 +388,27 @@ Future<Map<String, dynamic>> actualizarDisponibilidad(Map<String, dynamic> data)
       return filePath;
     } else {
       throw Exception('Error al descargar el documento: ${response.statusCode} - ${response.body}');
+    }
+  }
+
+  // Generar diagnóstico con IA
+  Future<Map<String, dynamic>> generarDiagnostico(String symptomsText) async {
+    final url = Uri.parse('$baseUrl/api/historial/generar-diagnostico');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'symptomsText': symptomsText,
+      }),
+    );
+    print('Solicitando diagnóstico a: $url');
+    print('Datos enviados: ${json.encode({'symptomsText': symptomsText})}');
+    print('Respuesta del servidor (diagnóstico): ${response.statusCode} - ${response.body}');
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data;
+    } else {
+      throw Exception('Error al generar diagnóstico: ${response.statusCode} - ${response.body}');
     }
   }
 
