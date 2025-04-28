@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'api_service.dart';
+import 'package:saludgest_app/api_service.dart';
 import 'historial.dart';
 import 'chat.dart';
 
@@ -75,7 +75,6 @@ class _SeleccionarPacientePageState extends State<SeleccionarPacientePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Definimos los colores para médicos, consistentes con InterfazPage
     final colors = {
       'gradientStart': Colors.red.shade800,
       'gradientEnd': Colors.red.shade600,

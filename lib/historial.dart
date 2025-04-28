@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'api_service.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:saludgest_app/api_service.dart';
+import 'package:saludgest_app/historial_dialogs.dart';
 import 'package:open_file/open_file.dart';
-import 'dart:io';
+import 'package:flutter/services.dart';
 
 class HistorialPage extends StatefulWidget {
   final String correo;
@@ -23,16 +23,7 @@ class HistorialPage extends StatefulWidget {
 class _HistorialPageState extends State<HistorialPage> {
   List<dynamic> historial = [];
   bool isLoading = true;
-  bool isGeneratingDiagnosis = false; // Nueva variable para controlar la animación de carga
   final ApiService apiService = ApiService();
-
-  final TextEditingController _sintomaController = TextEditingController();
-  final TextEditingController _diagnosticoController = TextEditingController();
-  final TextEditingController _tratamientoController = TextEditingController();
-  final TextEditingController _medicamentoNombreController = TextEditingController();
-  final TextEditingController _medicamentoDosisController = TextEditingController();
-  final TextEditingController _medicamentoFrecuenciaController = TextEditingController();
-  final TextEditingController _sintomasParaDiagnosticoController = TextEditingController();
 
   @override
   void initState() {
@@ -60,78 +51,6 @@ class _HistorialPageState extends State<HistorialPage> {
     }
   }
 
-  Future<void> _guardarEntrada(String tipo, Map<String, dynamic> datos) async {
-    try {
-      final String correoRegistrador = widget.tipoUsuario == 'medico' ? widget.medicoCorreo ?? '' : widget.correo;
-      if (correoRegistrador.isEmpty) {
-        throw Exception('Correo del registrador no proporcionado');
-      }
-
-      await apiService.guardarEntradaHistorial(
-        correoRegistrador,
-        tipo,
-        widget.correo,
-        datos,
-      );
-      await _fetchHistorial();
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$tipo guardado con éxito'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al guardar: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
-  }
-
-  Future<void> _subirDocumento() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf'],
-      );
-
-      if (result != null && result.files.single.path != null) {
-        File file = File(result.files.single.path!);
-        final String correoRegistrador = widget.tipoUsuario == 'medico' ? widget.medicoCorreo ?? '' : widget.correo;
-        if (correoRegistrador.isEmpty) {
-          throw Exception('Correo del registrador no proporcionado');
-        }
-
-        await apiService.subirDocumento(correoRegistrador, widget.correo, file);
-        await _fetchHistorial();
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Documento PDF subido con éxito'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se seleccionó ningún archivo'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al subir el documento: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
-  }
-
   Future<void> _descargarDocumento(String historialId, String documentoId) async {
     try {
       final filePath = await apiService.descargarDocumento(historialId, documentoId);
@@ -152,132 +71,6 @@ class _HistorialPageState extends State<HistorialPage> {
         ),
       );
     }
-  }
-
-  Future<void> _generarDiagnostico(String sintomasText) async {
-    try {
-      if (sintomasText.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No hay síntomas para analizar'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        return;
-      }
-
-      // Mostrar animación de carga
-      setState(() {
-        isGeneratingDiagnosis = true;
-      });
-      showDialog(
-        context: context,
-        barrierDismissible: false, // Evitar que el usuario cierre el diálogo mientras carga
-        builder: (context) => AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: _getColorsForRole()['accent']),
-              const SizedBox(height: 16),
-              const Text('Generando diagnóstico...'),
-            ],
-          ),
-        ),
-      );
-
-      // Generar el diagnóstico
-      final diagnosticoData = await apiService.generarDiagnostico(sintomasText);
-
-      // Cerrar el diálogo de carga
-      Navigator.pop(context);
-      setState(() {
-        isGeneratingDiagnosis = false;
-      });
-
-      // Mostrar el diagnóstico generado
-      _mostrarDialogoDiagnostico(diagnosticoData);
-    } catch (e) {
-      Navigator.pop(context); // Cerrar el diálogo de carga en caso de error
-      setState(() {
-        isGeneratingDiagnosis = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al generar diagnóstico: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
-  }
-
-  void _mostrarDialogoDiagnostico(Map<String, dynamic> diagnosticoData) {
-    final colors = _getColorsForRole();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text(
-          'Diagnóstico Generado por IA',
-          style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Síntomas Detectados:',
-                style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
-              ),
-              const SizedBox(height: 5),
-              ...diagnosticoData['symptoms'].map<Widget>((sintoma) => Text('- $sintoma')).toList(),
-              const SizedBox(height: 10),
-              Text(
-                'Posibles Diagnósticos:',
-                style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
-              ),
-              const SizedBox(height: 5),
-              ...diagnosticoData['possibleDiagnoses'].map<Widget>((diag) => Text(
-                  '- ${diag['diagnosis']} (${(diag['probability'] * 100).toStringAsFixed(0)}%)')),
-              const SizedBox(height: 10),
-              Text(
-                'Diagnóstico Principal:',
-                style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
-              ),
-              const SizedBox(height: 5),
-              Text(diagnosticoData['diagnosis']),
-              const SizedBox(height: 10),
-              Text(
-                'Recomendaciones:',
-                style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
-              ),
-              const SizedBox(height: 5),
-              Text(diagnosticoData['treatment']),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar', style: TextStyle(color: Colors.grey)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _extraerSintomasDelHistorial() {
-    List<String> sintomas = [];
-    for (var entry in historial) {
-      if (entry['sintomas']?.isNotEmpty ?? false) {
-        for (var sintoma in entry['sintomas']) {
-          if (sintoma['descripcion'] != null && sintoma['descripcion'].isNotEmpty) {
-            sintomas.add(sintoma['descripcion']);
-          }
-        }
-      }
-    }
-    return sintomas.isNotEmpty ? 'Paciente con ${sintomas.join(", ")}.' : '';
   }
 
   Map<String, Color> _getColorsForRole() {
@@ -307,269 +100,18 @@ class _HistorialPageState extends State<HistorialPage> {
   }
 
   void _mostrarDialogoAgregarEntrada() {
-    if (widget.tipoUsuario == 'paciente') {
-      _mostrarDialogoAgregarSintoma();
-    } else if (widget.tipoUsuario == 'medico') {
-      _mostrarDialogoSeleccionTipo();
-    }
-  }
-
-  void _mostrarDialogoSeleccionTipo() {
-    final colors = _getColorsForRole();
-    showDialog(
+    final dialogs = HistorialDialogs(
+      correo: widget.correo,
+      tipoUsuario: widget.tipoUsuario,
+      medicoCorreo: widget.medicoCorreo,
+      historial: historial,
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text(
-          'Seleccionar Tipo de Entrada',
-          style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildDialogOption('Síntoma', () => _mostrarDialogoAgregarSintoma(), colors['accent']!),
-            _buildDialogOption('Diagnóstico', () => _mostrarDialogoAgregarDiagnostico(), colors['accent']!),
-            _buildDialogOption('Tratamiento', () => _mostrarDialogoAgregarTratamiento(), colors['accent']!),
-            _buildDialogOption('Medicamento', () => _mostrarDialogoAgregarMedicamento(), colors['accent']!),
-            _buildDialogOption('Subir Documento PDF', () => _subirDocumento(), colors['accent']!),
-            _buildDialogOption('Generar Diagnóstico con IA', () => _mostrarDialogoSeleccionMetodoDiagnostico(), colors['accent']!),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
-          ),
-        ],
-      ),
+      onHistorialUpdated: _fetchHistorial,
     );
+    dialogs.showAgregarEntradaDialog();
   }
 
-  void _mostrarDialogoSeleccionMetodoDiagnostico() {
-    final colors = _getColorsForRole();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text(
-          'Seleccionar Método',
-          style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildDialogOption('Escribir Síntomas', () => _mostrarDialogoEscribirSintomas(), colors['accent']!),
-            _buildDialogOption('Usar Síntomas del Historial', () => _usarSintomasDelHistorial(), colors['accent']!),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _usarSintomasDelHistorial() {
-    final sintomasText = _extraerSintomasDelHistorial();
-    if (sintomasText.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se encontraron síntomas en el historial'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      Navigator.pop(context);
-      return;
-    }
-    _generarDiagnostico(sintomasText);
-  }
-
-  Widget _buildDialogOption(String title, VoidCallback onTap, Color accentColor) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ListTile(
-        title: Text(
-          title,
-          style: TextStyle(color: accentColor, fontWeight: FontWeight.w600),
-        ),
-        onTap: () {
-          Navigator.pop(context);
-          onTap();
-        },
-      ),
-    );
-  }
-
-  void _mostrarDialogoAgregarSintoma() {
-    final colors = _getColorsForRole();
-    _sintomaController.clear();
-    _mostrarDialogo(
-      title: 'Agregar Síntoma',
-      content: TextField(
-        controller: _sintomaController,
-        decoration: InputDecoration(
-          labelText: 'Descripción del síntoma',
-          border: const OutlineInputBorder(),
-          prefixIcon: Icon(Icons.sick, color: colors['accent']),
-        ),
-        maxLines: 3,
-      ),
-      onSave: () {
-        if (_sintomaController.text.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Por favor, ingresa un síntoma'), backgroundColor: Colors.redAccent),
-          );
-          return;
-        }
-        _guardarEntrada('sintomas', {'descripcion': _sintomaController.text});
-      },
-      accentColor: colors['accent']!,
-    );
-  }
-
-  void _mostrarDialogoAgregarDiagnostico() {
-    final colors = _getColorsForRole();
-    _diagnosticoController.clear();
-    _mostrarDialogo(
-      title: 'Agregar Diagnóstico',
-      content: TextField(
-        controller: _diagnosticoController,
-        decoration: InputDecoration(
-          labelText: 'Descripción del diagnóstico',
-          border: const OutlineInputBorder(),
-          prefixIcon: Icon(Icons.medical_information, color: colors['accent']),
-        ),
-        maxLines: 3,
-      ),
-      onSave: () {
-        if (_diagnosticoController.text.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Por favor, ingresa un diagnóstico'), backgroundColor: Colors.redAccent),
-          );
-          return;
-        }
-        _guardarEntrada('diagnosticos', {'descripcion': _diagnosticoController.text});
-      },
-      accentColor: colors['accent']!,
-    );
-  }
-
-  void _mostrarDialogoAgregarTratamiento() {
-    final colors = _getColorsForRole();
-    _tratamientoController.clear();
-    _mostrarDialogo(
-      title: 'Agregar Tratamiento',
-      content: TextField(
-        controller: _tratamientoController,
-        decoration: InputDecoration(
-          labelText: 'Descripción del tratamiento',
-          border: const OutlineInputBorder(),
-          prefixIcon: Icon(Icons.healing, color: colors['accent']),
-        ),
-        maxLines: 3,
-      ),
-      onSave: () {
-        if (_tratamientoController.text.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Por favor, ingresa un tratamiento'), backgroundColor: Colors.redAccent),
-          );
-          return;
-        }
-        _guardarEntrada('tratamientos', {'descripcion': _tratamientoController.text});
-      },
-      accentColor: colors['accent']!,
-    );
-  }
-
-  void _mostrarDialogoAgregarMedicamento() {
-    final colors = _getColorsForRole();
-    _medicamentoNombreController.clear();
-    _medicamentoDosisController.clear();
-    _medicamentoFrecuenciaController.clear();
-    _mostrarDialogo(
-      title: 'Agregar Medicamento',
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _medicamentoNombreController,
-              decoration: InputDecoration(
-                labelText: 'Nombre del medicamento',
-                border: const OutlineInputBorder(),
-                prefixIcon: Icon(Icons.medication, color: colors['accent']),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _medicamentoDosisController,
-              decoration: InputDecoration(
-                labelText: 'Dosis',
-                border: const OutlineInputBorder(),
-                prefixIcon: Icon(Icons.local_pharmacy, color: colors['accent']),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _medicamentoFrecuenciaController,
-              decoration: InputDecoration(
-                labelText: 'Frecuencia',
-                border: const OutlineInputBorder(),
-                prefixIcon: Icon(Icons.schedule, color: colors['accent']),
-              ),
-            ),
-          ],
-        ),
-      ),
-      onSave: () {
-        if (_medicamentoNombreController.text.isEmpty ||
-            _medicamentoDosisController.text.isEmpty ||
-            _medicamentoFrecuenciaController.text.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Por favor, completa todos los campos'), backgroundColor: Colors.redAccent),
-          );
-          return;
-        }
-        _guardarEntrada('medicamentos', {
-          'nombre': _medicamentoNombreController.text,
-          'dosis': _medicamentoDosisController.text,
-          'frecuencia': _medicamentoFrecuenciaController.text,
-          'fecha_inicio': DateTime.now().toIso8601String(),
-        });
-      },
-      accentColor: colors['accent']!,
-    );
-  }
-
-  void _mostrarDialogoEscribirSintomas() {
-    final colors = _getColorsForRole();
-    _sintomasParaDiagnosticoController.clear();
-    _mostrarDialogo(
-      title: 'Generar Diagnóstico con IA',
-      content: TextField(
-        controller: _sintomasParaDiagnosticoController,
-        decoration: InputDecoration(
-          labelText: 'Describe los síntomas del paciente',
-          border: const OutlineInputBorder(),
-          prefixIcon: Icon(Icons.analytics, color: colors['accent']),
-        ),
-        maxLines: 3,
-      ),
-      onSave: () => _generarDiagnostico(_sintomasParaDiagnosticoController.text),
-      accentColor: colors['accent']!,
-    );
-  }
-
-  void _mostrarDialogo({
-    required String title,
-    required Widget content,
-    required VoidCallback onSave,
-    required Color accentColor,
-  }) {
+  void _mostrarContenidoCompleto(String title, String contenido, Color accentColor) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -578,19 +120,28 @@ class _HistorialPageState extends State<HistorialPage> {
           title,
           style: TextStyle(fontWeight: FontWeight.bold, color: accentColor),
         ),
-        content: content,
+        content: SingleChildScrollView(
+          child: Text(
+            contenido,
+            style: const TextStyle(fontSize: 16, color: Colors.black87),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            child: const Text('Cerrar', style: TextStyle(color: Colors.grey)),
           ),
-          ElevatedButton(
-            onPressed: onSave,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Diagnosticar', style: TextStyle(color: Colors.white)),
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: contenido));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Contenido copiado al portapapeles'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            child: const Text('Copiar', style: TextStyle(color: Colors.blue)),
           ),
         ],
       ),
@@ -601,7 +152,7 @@ class _HistorialPageState extends State<HistorialPage> {
   Widget build(BuildContext context) {
     final colors = _getColorsForRole();
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: Column(
@@ -619,6 +170,7 @@ class _HistorialPageState extends State<HistorialPage> {
                 Tab(text: 'Medicamentos'),
                 Tab(text: 'Análisis'),
                 Tab(text: 'Documentos'),
+                Tab(text: 'Órdenes de Análisis'),
               ],
             ),
             Expanded(
@@ -639,6 +191,7 @@ class _HistorialPageState extends State<HistorialPage> {
                             _buildTabContent('medicamentos', Icons.medication, colors),
                             _buildTabContent('resultados_analisis', Icons.analytics, colors),
                             _buildDocumentTab('documentos', Icons.picture_as_pdf, colors),
+                            _buildOrdenesAnalisisTab('ordenes_analisis', Icons.science, colors),
                           ],
                         ),
             ),
@@ -758,6 +311,81 @@ class _HistorialPageState extends State<HistorialPage> {
                 detalle = entry['resultados'].toString();
               }
 
+              const int maxLength = 100;
+              bool isTruncated = detalle.length > maxLength;
+              String displayText = isTruncated ? '${detalle.substring(0, maxLength)}...' : detalle;
+
+              String relacionado = 'Ninguno';
+              if (key == 'diagnosticos') {
+                String? sintomaId;
+
+                if (entry.containsKey('sintomas_relacionados') && entry['sintomas_relacionados'] != null) {
+                  final relacionados = entry['sintomas_relacionados'];
+                  if (relacionados is List && relacionados.isNotEmpty) {
+                    final relacionadoItem = relacionados[0];
+                    if (relacionadoItem is Map && relacionadoItem.containsKey('descripcion') && relacionadoItem['descripcion'] != null) {
+                      relacionado = relacionadoItem['descripcion'];
+                    } else if (relacionadoItem is String) {
+                      sintomaId = relacionadoItem;
+                    }
+                  }
+                }
+
+                if (sintomaId == null && entry.containsKey('sintoma_id') && entry['sintoma_id'] != null) {
+                  sintomaId = entry['sintoma_id'];
+                }
+
+                if (sintomaId != null) {
+                  String? descripcionSintoma;
+                  for (var hist in historial) {
+                    if (hist['sintomas'] != null && hist['sintomas'] is List) {
+                      for (var sintoma in hist['sintomas']) {
+                        if (sintoma['_id'] == sintomaId) {
+                          descripcionSintoma = sintoma['descripcion'];
+                          break;
+                        }
+                      }
+                      if (descripcionSintoma != null) break;
+                    }
+                  }
+                  relacionado = descripcionSintoma ?? 'Síntoma no encontrado (ID: $sintomaId)';
+                }
+              } else if (key == 'tratamientos') {
+                String? diagnosticoId = entry['diagnostico_relacionado'];
+                if (diagnosticoId != null) {
+                  String? descripcionDiagnostico;
+                  for (var hist in historial) {
+                    if (hist['diagnosticos'] != null && hist['diagnosticos'] is List) {
+                      for (var diagnostico in hist['diagnosticos']) {
+                        if (diagnostico['_id'] == diagnosticoId) {
+                          descripcionDiagnostico = diagnostico['descripcion'];
+                          break;
+                        }
+                      }
+                      if (descripcionDiagnostico != null) break;
+                    }
+                  }
+                  relacionado = descripcionDiagnostico ?? 'Diagnóstico no encontrado (ID: $diagnosticoId)';
+                }
+              } else if (key == 'medicamentos') {
+                String? tratamientoId = entry['tratamiento_relacionado'];
+                if (tratamientoId != null) {
+                  String? descripcionTratamiento;
+                  for (var hist in historial) {
+                    if (hist['tratamientos'] != null && hist['tratamientos'] is List) {
+                      for (var tratamiento in hist['tratamientos']) {
+                        if (tratamiento['_id'] == tratamientoId) {
+                          descripcionTratamiento = tratamiento['descripcion'];
+                          break;
+                        }
+                      }
+                      if (descripcionTratamiento != null) break;
+                    }
+                  }
+                  relacionado = descripcionTratamiento ?? 'Tratamiento no encontrado (ID: $tratamientoId)';
+                }
+              }
+
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -768,15 +396,88 @@ class _HistorialPageState extends State<HistorialPage> {
                     border: Border.all(color: colors['accent']!),
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  child: ListTile(
-                    leading: Icon(icon, color: colors['accent'], size: 30),
-                    title: Text(
-                      detalle,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
-                    ),
-                    subtitle: Text(
-                      'Fecha: $fecha',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ListTile(
+                      leading: Icon(icon, color: colors['accent'], size: 30),
+                      title: Text(
+                        displayText,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Fecha: $fecha',
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          if (relacionado != 'Ninguno') ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.green.shade300),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.link,
+                                    size: 14,
+                                    color: Colors.green,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      relacionado,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.green.shade800,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      onTap: () {
+                        String title;
+                        switch (key) {
+                          case 'sintomas':
+                            title = 'Síntoma';
+                            break;
+                          case 'diagnosticos':
+                            title = 'Diagnóstico';
+                            break;
+                          case 'tratamientos':
+                            title = 'Tratamiento';
+                            break;
+                          case 'medicamentos':
+                            title = 'Medicamento';
+                            break;
+                          case 'resultados_analisis':
+                            title = 'Resultado de Análisis';
+                            break;
+                          default:
+                            title = 'Entrada';
+                        }
+                        _mostrarContenidoCompleto(title, detalle, colors['accent']!);
+                      },
+                      trailing: isTruncated
+                          ? Icon(Icons.expand_more, color: colors['accent'])
+                          : null,
                     ),
                   ),
                 ),
@@ -821,9 +522,9 @@ class _HistorialPageState extends State<HistorialPage> {
                   ),
                   child: ListTile(
                     leading: Icon(icon, color: colors['accent'], size: 30),
-                    title: const Text(
-                      'Documento PDF',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+                    title: Text(
+                      doc['nombre'] ?? 'Documento PDF',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
                     ),
                     subtitle: Text(
                       'Fecha: $fecha',
@@ -841,15 +542,54 @@ class _HistorialPageState extends State<HistorialPage> {
           );
   }
 
-  @override
-  void dispose() {
-    _sintomaController.dispose();
-    _diagnosticoController.dispose();
-    _tratamientoController.dispose();
-    _medicamentoNombreController.dispose();
-    _medicamentoDosisController.dispose();
-    _medicamentoFrecuenciaController.dispose();
-    _sintomasParaDiagnosticoController.dispose();
-    super.dispose();
+  Widget _buildOrdenesAnalisisTab(String key, IconData icon, Map<String, Color> colors) {
+    List<dynamic> ordenes = [];
+    for (var entry in historial) {
+      if (entry[key]?.isNotEmpty ?? false) {
+        ordenes.addAll(entry[key].map((e) => {...e, 'historialId': entry['_id']}));
+      }
+    }
+
+    return ordenes.isEmpty
+        ? const Center(
+            child: Text(
+              'No hay órdenes de análisis pendientes',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: ordenes.length,
+            itemBuilder: (context, index) {
+              final orden = ordenes[index];
+              String tipo = orden['tipo'] ?? 'Sin tipo';
+              String fecha = orden['fecha'] ?? 'Sin fecha';
+              String estado = orden['estado'] ?? 'Pendiente';
+
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                elevation: 3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: colors['accent']!),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: ListTile(
+                    leading: Icon(icon, color: colors['accent'], size: 30),
+                    title: Text(
+                      tipo,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+                    ),
+                    subtitle: Text(
+                      'Fecha: $fecha | Estado: $estado',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
   }
 }

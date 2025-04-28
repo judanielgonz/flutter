@@ -4,7 +4,7 @@ import 'historial.dart';
 
 class GestionarPage extends StatefulWidget {
   final String? medicoId;
-  final String? medicoCorreo; // Nuevo parámetro para el correo del médico
+  final String? medicoCorreo;
 
   const GestionarPage({Key? key, this.medicoId, this.medicoCorreo}) : super(key: key);
 
@@ -38,7 +38,10 @@ class _GestionarPageState extends State<GestionarPage> {
         isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al cargar los pacientes: $e')),
+        SnackBar(
+          content: Text('Error al cargar los pacientes: $e'),
+          backgroundColor: Colors.red.shade800,
+        ),
       );
     }
   }
@@ -50,7 +53,7 @@ class _GestionarPageState extends State<GestionarPage> {
         builder: (context) => HistorialPage(
           correo: correoPaciente,
           tipoUsuario: 'medico',
-          medicoCorreo: widget.medicoCorreo, // Pasamos el correo del médico
+          medicoCorreo: widget.medicoCorreo,
         ),
       ),
     );
@@ -65,7 +68,11 @@ class _GestionarPageState extends State<GestionarPage> {
         elevation: 0,
         title: const Text(
           'Gestionar Pacientes',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -73,24 +80,29 @@ class _GestionarPageState extends State<GestionarPage> {
         ),
       ),
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.teal.shade50, Colors.teal.shade200],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+        color: const Color(0xFFD32F2F), // Deep red background matching the screenshot
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                    : pacientes.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No tienes pacientes asignados',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          )
+                        : _buildPacientesList(),
+              ),
+            ],
           ),
-        ),
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : pacientes.isEmpty
-                      ? const Center(child: Text('No tienes pacientes asignados'))
-                      : _buildPacientesList(),
-            ),
-          ],
         ),
       ),
     );
@@ -99,28 +111,48 @@ class _GestionarPageState extends State<GestionarPage> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
       decoration: BoxDecoration(
-        color: Colors.teal.shade700,
+        color: const Color(0xFFB71C1C), // Darker red for the header
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(30),
           bottomRight: Radius.circular(30),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.person_add,
-            size: 60,
-            color: Colors.white,
+          CircleAvatar(
+            radius: 40,
+            backgroundColor: Colors.white.withOpacity(0.1),
+            child: const Icon(
+              Icons.person_add,
+              size: 50,
+              color: Colors.white,
+            ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 15),
           const Text(
             "Gestionar Pacientes",
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.white,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Administra la información de tus pacientes",
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white.withOpacity(0.7),
             ),
           ),
         ],
@@ -140,43 +172,64 @@ class _GestionarPageState extends State<GestionarPage> {
   }
 
   Widget _buildPacienteCard(Map<String, dynamic> paciente) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.teal.shade200, Colors.teal.shade400],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return GestureDetector(
+      onTap: () => _verHistorial(paciente['correo']),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE57373), // Lighter red for cards
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            offset: Offset(0, 4),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(15),
-        title: Text(
-          paciente['nombre_completo'] ?? 'Sin nombre',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            fontSize: 18,
-          ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 25,
+              backgroundColor: Colors.white.withOpacity(0.2),
+              child: const Icon(
+                Icons.person,
+                color: Colors.white,
+                size: 30,
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    paciente['nombre_completo'] ?? 'Sin nombre',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    paciente['correo'] ?? 'Sin correo',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white.withOpacity(0.5),
+              size: 20,
+            ),
+          ],
         ),
-        subtitle: Text(
-          paciente['correo'] ?? 'Sin correo',
-          style: const TextStyle(color: Colors.white70),
-        ),
-        leading: const Icon(
-          Icons.person,
-          color: Colors.white,
-          size: 30,
-        ),
-        onTap: () => _verHistorial(paciente['correo']),
       ),
     );
   }

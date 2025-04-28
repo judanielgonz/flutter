@@ -240,6 +240,7 @@ class ApiService {
     }
   }
 
+  // Eliminar disponibilidad
   Future<Map<String, dynamic>> eliminarDisponibilidad(Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/pacientes/eliminar-disponibilidad');
     final response = await http.post(
@@ -251,7 +252,7 @@ class ApiService {
         'horario': data['horario'],
       }),
     );
-    print(' Solicitando eliminar disponibilidad a: $url');
+    print('Solicitando eliminar disponibilidad a: $url');
     print('Datos enviados: ${json.encode(data)}');
     print('Respuesta del servidor: ${response.statusCode} - ${response.body}');
     final responseBody = json.decode(response.body);
@@ -310,6 +311,14 @@ class ApiService {
   Future<Map<String, dynamic>> guardarEntradaHistorial(
       String correoRegistrador, String tipo, String pacienteCorreo, Map<String, dynamic> datos) async {
     final url = Uri.parse('$baseUrl/api/historial/guardar-entrada');
+    print('Solicitando guardar entrada en historial a: $url');
+    print('Datos enviados: ${json.encode({
+      'correo': correoRegistrador,
+      'tipo': tipo,
+      'pacienteCorreo': pacienteCorreo,
+      'datos': datos,
+    })}');
+
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
@@ -320,19 +329,21 @@ class ApiService {
         'datos': datos,
       }),
     );
-    print('Solicitando guardar entrada en historial a: $url');
-    print('Datos enviados: ${json.encode({
-      'correo': correoRegistrador,
-      'tipo': tipo,
-      'pacienteCorreo': pacienteCorreo,
-      'datos': datos,
-    })}');
+
     print('Respuesta del servidor (guardar entrada): ${response.statusCode} - ${response.body}');
     final responseBody = json.decode(response.body);
+
     if (response.statusCode == 200 && responseBody['success'] == true) {
       return responseBody;
     } else {
-      throw Exception(responseBody['error'] ?? 'Error al guardar la entrada en el historial: ${response.body}');
+      // Mejor manejo de errores para casos específicos, como IDs inválidos
+      String errorMessage = responseBody['error'] ?? 'Error al guardar la entrada en el historial';
+      if (responseBody['error']?.contains('diagnóstico especificado no existe') ?? false) {
+        errorMessage = 'El diagnóstico seleccionado no existe en el historial del paciente.';
+      } else if (responseBody['error']?.contains('tratamiento especificado no existe') ?? false) {
+        errorMessage = 'El tratamiento seleccionado no existe en el historial del paciente.';
+      }
+      throw Exception(errorMessage);
     }
   }
 
@@ -361,12 +372,47 @@ class ApiService {
     if (response.statusCode == 200) {
       final decoded = jsonDecode(responseBody);
       if (decoded['success'] == true) {
-        return decoded; // Ahora incluye extractedData con diagnósticos, tratamientos y resultados
+        return decoded;
       } else {
         throw Exception(decoded['error'] ?? 'Error al subir el documento');
       }
     } else {
       throw Exception('Error al subir el documento: ${response.statusCode} - $responseBody');
+    }
+  }
+
+  // Subir un resultado de análisis al historial médico
+  Future<Map<String, dynamic>> subirResultadoAnalisis(
+      String correoRegistrador, String pacienteCorreo, String ordenId, File file) async {
+    final url = Uri.parse('$baseUrl/api/historial/subir-resultado-analisis');
+    final request = http.MultipartRequest('POST', url);
+    request.fields['correo'] = correoRegistrador;
+    request.fields['pacienteCorreo'] = pacienteCorreo;
+    request.fields['orden_id'] = ordenId;
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'documento',
+        file.path,
+        contentType: MediaType('application', 'pdf'),
+      ),
+    );
+    print('Subiendo resultado de análisis a: $url');
+    print('Archivo: ${file.path}, Orden ID: $ordenId');
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+
+    print('Código de estado al subir resultado: ${response.statusCode}');
+    print('Respuesta del servidor: $responseBody');
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(responseBody);
+      if (decoded['success'] == true) {
+        return decoded;
+      } else {
+        throw Exception(decoded['error'] ?? 'Error al subir el resultado de análisis');
+      }
+    } else {
+      throw Exception('Error al subir el resultado de análisis: ${response.statusCode} - $responseBody');
     }
   }
 
@@ -475,6 +521,31 @@ class ApiService {
       return json.decode(response.body);
     } else {
       throw Exception('Error al actualizar persona: ${response.body}');
+    }
+  }
+
+  // Otorgar permiso a otro médico para ver el historial
+  Future<Map<String, dynamic>> otorgarPermisoHistorial(String pacienteCorreo, String medicoCorreo) async {
+    final url = Uri.parse('$baseUrl/api/pacientes/otorgar-permiso');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'pacienteCorreo': pacienteCorreo,
+        'medicoCorreo': medicoCorreo,
+      }),
+    );
+    print('Solicitando otorgar permiso a: $url');
+    print('Datos enviados: ${json.encode({
+      'pacienteCorreo': pacienteCorreo,
+      'medicoCorreo': medicoCorreo,
+    })}');
+    print('Respuesta del servidor (otorgar permiso): ${response.statusCode} - ${response.body}');
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data;
+    } else {
+      throw Exception('Error al otorgar permiso: ${response.body}');
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:saludgest_app/api_service.dart';
+import 'package:http/http.dart' as http;
 
 class NotificacionesPage extends StatefulWidget {
   @override
@@ -18,9 +19,14 @@ class _NotificacionesPageState extends State<NotificacionesPage> {
   }
 
   Future<void> _fetchNotificaciones() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     try {
       final apiService = ApiService();
-      final notificaciones = await apiService.getNotificaciones(); // Nueva función en ApiService
+      final notificaciones = await apiService.getNotificaciones();
       setState(() {
         _notificaciones = notificaciones;
         _isLoading = false;
@@ -30,6 +36,7 @@ class _NotificacionesPageState extends State<NotificacionesPage> {
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
         _isLoading = false;
       });
+      print('Error al obtener notificaciones: $e');
     }
   }
 
@@ -44,13 +51,34 @@ class _NotificacionesPageState extends State<NotificacionesPage> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Text(_errorMessage!, style: TextStyle(color: Colors.red)))
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Error al obtener notificaciones: $_errorMessage',
+                        style: TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: _fetchNotificaciones,
+                        child: Text('Reintentar'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
               : Padding(
                   padding: EdgeInsets.all(20.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Notificaciones", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text("Notificaciones",
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
                       SizedBox(height: 10),
                       Expanded(
                         child: _notificaciones.isEmpty
@@ -61,11 +89,14 @@ class _NotificacionesPageState extends State<NotificacionesPage> {
                                   final notificacion = _notificaciones[index];
                                   return Card(
                                     child: ListTile(
-                                      leading: Icon(Icons.notification_important, color: Colors.teal.shade700),
-                                      title: Text(notificacion['tipo']),
-                                      subtitle: Text(notificacion['contenido']),
+                                      leading: Icon(Icons.notification_important,
+                                          color: Colors.teal.shade700),
+                                      title: Text(notificacion['tipo'] ?? 'Sin tipo'),
+                                      subtitle: Text(notificacion['contenido'] ?? 'Sin contenido'),
                                       trailing: Icon(
-                                        notificacion['estado'] == 'Entregada' ? Icons.check_circle : Icons.circle,
+                                        notificacion['estado'] == 'Entregada'
+                                            ? Icons.check_circle
+                                            : Icons.circle,
                                         color: Colors.green,
                                       ),
                                     ),
@@ -79,4 +110,3 @@ class _NotificacionesPageState extends State<NotificacionesPage> {
     );
   }
 }
-//este codigo se llama notificaciones.dart
