@@ -27,7 +27,19 @@ class NotificacionesService {
   }
 
   // Enviar una notificación
-  Future<void> showNotification(String title, String body) async {
+  Future<void> showNotification({
+    Map<String, dynamic>? notificacion,
+    String? title,
+    String? body,
+  }) async {
+    // Determinar el título y el cuerpo según los parámetros proporcionados
+    final String notificationTitle = notificacion != null
+        ? (notificacion['tipo']?.toString().capitalize() ?? 'Notificación')
+        : (title ?? 'Notificación');
+    final String notificationBody = notificacion != null
+        ? (notificacion['contenido'] ?? 'Sin contenido')
+        : (body ?? 'Sin contenido');
+
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'channel_id',
       'Canal de Notificaciones',
@@ -41,9 +53,16 @@ class NotificacionesService {
 
     await _notificationsPlugin.show(
       0,
-      title,
-      body,
+      notificationTitle,
+      notificationBody,
       notificationDetails,
     );
+  }
+}
+
+// Extensión para capitalizar cadenas
+extension StringExtension on String {
+  String capitalize() {
+    return "${this[0].toUpperCase()}${substring(1)}";
   }
 }

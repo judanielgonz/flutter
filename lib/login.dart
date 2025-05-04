@@ -52,8 +52,8 @@ class _LoginPageState extends State<LoginPage> {
         final tipoUsuario = _normalize(response['tipoUsuario']);
         
         await _notificacionesService.showNotification(
-          '¡Bienvenido a SaludGest!',
-          'Has iniciado sesión como $tipoUsuario.',
+          title: '¡Bienvenido a SaludGest!',
+          body: 'Has iniciado sesión como $tipoUsuario.',
         );
 
         if (tipoUsuario == 'paciente' || tipoUsuario == 'medico') {

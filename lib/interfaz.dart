@@ -124,10 +124,26 @@ class _InterfazPageState extends State<InterfazPage> {
       case 0:
         break;
       case 1:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => NotificacionesPage()),
-        );
+        if (widget.usuarioId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => NotificacionesPage(
+                usuarioId: widget.usuarioId!,
+                correo: widget.correo,
+                tipoUsuario: widget.tipoUsuario,
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: No se encontró el ID del usuario. Por favor, inicia sesión nuevamente.')),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+          );
+        }
         break;
       case 2:
         Navigator.push(

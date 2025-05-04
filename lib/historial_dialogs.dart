@@ -10,6 +10,7 @@ class HistorialDialogs {
   final String correo;
   final String tipoUsuario;
   final String? medicoCorreo;
+  final String nombrePaciente; // Nuevo campo para el nombre del paciente
   final List<dynamic> historial;
   final BuildContext context;
   final VoidCallback onHistorialUpdated;
@@ -31,6 +32,7 @@ class HistorialDialogs {
     required this.historial,
     required this.context,
     required this.onHistorialUpdated,
+    required this.nombrePaciente, // Requerir nombre del paciente
     this.medicoCorreo,
   });
 
@@ -62,7 +64,7 @@ class HistorialDialogs {
 
   Future<void> _guardarEntrada(String tipo, Map<String, dynamic> datos) async {
     try {
-      final String correoRegistrador = tipoUsuario == 'medico' ? medicoCorreo ?? '' : correo;
+      final String correoRegistrador = tipoUsuario == 'medico' ? medicoCorreo ?? correo : correo;
       if (correoRegistrador.isEmpty) {
         throw Exception('Correo del registrador no proporcionado');
       }
@@ -72,12 +74,13 @@ class HistorialDialogs {
         tipo,
         correo,
         datos,
+        nombrePaciente, // Pasar nombre del paciente
       );
       onHistorialUpdated();
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$tipo guardado con éxito'),
+          content: Text('${tipo[0].toUpperCase()}${tipo.substring(1)} guardado con éxito'),
           backgroundColor: Colors.green,
         ),
       );
@@ -100,12 +103,12 @@ class HistorialDialogs {
 
       if (result != null && result.files.single.path != null) {
         File file = File(result.files.single.path!);
-        final String correoRegistrador = tipoUsuario == 'medico' ? medicoCorreo ?? '' : correo;
+        final String correoRegistrador = tipoUsuario == 'medico' ? medicoCorreo ?? correo : correo;
         if (correoRegistrador.isEmpty) {
           throw Exception('Correo del registrador no proporcionado');
         }
 
-        await apiService.subirDocumento(correoRegistrador, correo, file);
+        await apiService.subirDocumento(correoRegistrador, correo, file, nombrePaciente);
         onHistorialUpdated();
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -141,7 +144,8 @@ class HistorialDialogs {
 
       if (result != null && result.files.single.path != null) {
         File file = File(result.files.single.path!);
-        await apiService.subirResultadoAnalisis(correo, correo, ordenId, file);
+        final String correoRegistrador = tipoUsuario == 'medico' ? medicoCorreo ?? correo : correo;
+        await apiService.subirResultadoAnalisis(correoRegistrador, correo, ordenId, file, nombrePaciente);
         onHistorialUpdated();
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -237,14 +241,14 @@ class HistorialDialogs {
                 style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
               ),
               const SizedBox(height: 5),
-              ...diagnosticoData['symptoms'].map<Widget>((sintoma) => Text('- $sintoma')).toList(),
+              ...?diagnosticoData['symptoms']?.map<Widget>((sintoma) => Text('- $sintoma'))?.toList() ?? [],
               const SizedBox(height: 10),
               Text(
                 'Posibles Diagnósticos:',
                 style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
               ),
               const SizedBox(height: 5),
-              ...diagnosticoData['possibleDiagnoses'].map<Widget>((diag) => Text(
+              ...?diagnosticoData['possibleDiagnoses']?.map<Widget>((diag) => Text(
                   '- ${diag['diagnosis']} (${(diag['probability'] * 100).toStringAsFixed(0)}%)')),
               const SizedBox(height: 10),
               Text(
@@ -252,14 +256,14 @@ class HistorialDialogs {
                 style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
               ),
               const SizedBox(height: 5),
-              Text(diagnosticoData['diagnosis']),
+              Text(diagnosticoData['diagnosis'] ?? 'No disponible'),
               const SizedBox(height: 10),
               Text(
                 'Recomendaciones:',
                 style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
               ),
               const SizedBox(height: 5),
-              Text(diagnosticoData['treatment']),
+              Text(diagnosticoData['treatment'] ?? 'No disponible'),
             ],
           ),
         ),
@@ -280,6 +284,15 @@ class HistorialDialogs {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cerrar', style: TextStyle(color: Colors.grey)),
           ),
+          if (tipoUsuario == 'medico')
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _diagnosticoController.text = diagnosticoData['diagnosis'] ?? '';
+                _mostrarDialogoAgregarDiagnostico();
+              },
+              child: Text('Usar Diagnóstico', style: TextStyle(color: colors['accent'])),
+            ),
         ],
       ),
     );
@@ -312,22 +325,55 @@ class HistorialDialogs {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text(
-          'Seleccionar Acción',
-          style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [colors['header']!, colors['headerGradient']!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Text(
+            'Seleccionar Acción',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 20,
+            ),
+          ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildDialogOption('Agregar Síntoma', () => _mostrarDialogoAgregarSintoma(), colors['accent']!),
-            _buildDialogOption('Subir Resultado de Análisis', () => _mostrarDialogoSeleccionOrdenAnalisis(), colors['accent']!),
-          ],
+        content: Container(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDialogOption(
+                title: 'Agregar Síntoma',
+                icon: Icons.sick,
+                onTap: () => _mostrarDialogoAgregarSintoma(),
+                colors: colors,
+              ),
+              const SizedBox(height: 8),
+              _buildDialogOption(
+                title: 'Subir Resultado de Análisis',
+                icon: Icons.upload_file,
+                onTap: () => _mostrarDialogoSeleccionOrdenAnalisis(),
+                colors: colors,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -339,28 +385,106 @@ class HistorialDialogs {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text(
-          'Seleccionar Tipo de Entrada',
-          style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [colors['header']!, colors['headerGradient']!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Text(
+            'Seleccionar Tipo de Entrada',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 20,
+            ),
+          ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildDialogOption('Síntoma', () => _mostrarDialogoAgregarSintoma(), colors['accent']!),
-            _buildDialogOption('Diagnóstico', () => _mostrarDialogoAgregarDiagnostico(), colors['accent']!),
-            _buildDialogOption('Tratamiento', () => _mostrarDialogoAgregarTratamiento(), colors['accent']!),
-            _buildDialogOption('Medicamento', () => _mostrarDialogoAgregarMedicamento(), colors['accent']!),
-            _buildDialogOption('Orden de Análisis', () => _mostrarDialogoAgregarOrdenAnalisis(), colors['accent']!),
-            _buildDialogOption('Subir Documento PDF', () => _subirDocumento(), colors['accent']!),
-            _buildDialogOption('Generar Diagnóstico con IA', () => _mostrarDialogoSeleccionMetodoDiagnostico(), colors['accent']!),
-            _buildDialogOption('Otorgar Permiso a Otro Médico', () => _mostrarDialogoOtorgarPermiso(), colors['accent']!),
-          ],
+        content: Container(
+          width: 300,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildDialogOption(
+                  title: 'Síntoma',
+                  icon: Icons.sick,
+                  onTap: () => _mostrarDialogoAgregarSintoma(),
+                  colors: colors,
+                ),
+                const SizedBox(height: 8),
+                _buildDialogOption(
+                  title: 'Diagnóstico',
+                  icon: Icons.medical_information,
+                  onTap: () => _mostrarDialogoAgregarDiagnostico(),
+                  colors: colors,
+                ),
+                const SizedBox(height: 8),
+                _buildDialogOption(
+                  title: 'Tratamiento',
+                  icon: Icons.healing,
+                  onTap: () => _mostrarDialogoAgregarTratamiento(),
+                  colors: colors,
+                ),
+                const SizedBox(height: 8),
+                _buildDialogOption(
+                  title: 'Medicamento',
+                  icon: Icons.medication,
+                  onTap: () => _mostrarDialogoAgregarMedicamento(),
+                  colors: colors,
+                ),
+                const SizedBox(height: 8),
+                _buildDialogOption(
+                  title: 'Orden de Análisis',
+                  icon: Icons.science,
+                  onTap: () => _mostrarDialogoAgregarOrdenAnalisis(),
+                  colors: colors,
+                ),
+                const SizedBox(height: 8),
+                _buildDialogOption(
+                  title: 'Subir Resultado de Análisis',
+                  icon: Icons.upload_file,
+                  onTap: () => _mostrarDialogoSeleccionOrdenAnalisis(),
+                  colors: colors,
+                ),
+                const SizedBox(height: 8),
+                _buildDialogOption(
+                  title: 'Subir Documento PDF',
+                  icon: Icons.picture_as_pdf,
+                  onTap: () => _subirDocumento(),
+                  colors: colors,
+                ),
+                const SizedBox(height: 8),
+                _buildDialogOption(
+                  title: 'Generar Diagnóstico con IA',
+                  icon: Icons.analytics,
+                  onTap: () => _mostrarDialogoSeleccionMetodoDiagnostico(),
+                  colors: colors,
+                ),
+                const SizedBox(height: 8),
+                _buildDialogOption(
+                  title: 'Otorgar Permiso a Otro Médico',
+                  icon: Icons.email,
+                  onTap: () => _mostrarDialogoOtorgarPermiso(),
+                  colors: colors,
+                ),
+              ],
+            ),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -372,22 +496,55 @@ class HistorialDialogs {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text(
-          'Seleccionar Método',
-          style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [colors['header']!, colors['headerGradient']!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Text(
+            'Seleccionar Método',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 20,
+            ),
+          ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildDialogOption('Escribir Síntomas', () => _mostrarDialogoEscribirSintomas(), colors['accent']!),
-            _buildDialogOption('Usar Síntomas del Historial', () => _usarSintomasDelHistorial(), colors['accent']!),
-          ],
+        content: Container(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDialogOption(
+                title: 'Escribir Síntomas',
+                icon: Icons.edit,
+                onTap: () => _mostrarDialogoEscribirSintomas(),
+                colors: colors,
+              ),
+              const SizedBox(height: 8),
+              _buildDialogOption(
+                title: 'Usar Síntomas del Historial',
+                icon: Icons.history,
+                onTap: () => _usarSintomasDelHistorial(),
+                colors: colors,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -416,27 +573,53 @@ class HistorialDialogs {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text(
-          'Seleccionar Orden de Análisis',
-          style: TextStyle(fontWeight: FontWeight.bold, color: colors['accent']),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [colors['header']!, colors['headerGradient']!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Text(
+            'Seleccionar Orden de Análisis',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 20,
+            ),
+          ),
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: ordenes.map((orden) {
-              return _buildDialogOption(
-                orden['tipo'],
-                () => _subirResultadoAnalisis(orden['orden_id']),
-                colors['accent']!,
-              );
-            }).toList(),
+        content: Container(
+          width: 300,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: ordenes.map((orden) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _buildDialogOption(
+                    title: orden['tipo'] ?? 'Sin tipo',
+                    icon: Icons.description,
+                    onTap: () => _subirResultadoAnalisis(orden['orden_id']),
+                    colors: colors,
+                  ),
+                );
+              }).toList(),
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -458,19 +641,56 @@ class HistorialDialogs {
     _generarDiagnostico(sintomasText, true);
   }
 
-  Widget _buildDialogOption(String title, VoidCallback onTap, Color accentColor) {
+  Widget _buildDialogOption({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+    required Map<String, Color> colors,
+  }) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ListTile(
-        title: Text(
-          title,
-          style: TextStyle(color: accentColor, fontWeight: FontWeight.w600),
-        ),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
         onTap: () {
           Navigator.pop(context);
           onTap();
         },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colors['iconBackground']!.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: colors['accent'],
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: colors['accent'],
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                color: colors['accent']!.withOpacity(0.5),
+                size: 16,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -507,11 +727,22 @@ class HistorialDialogs {
     _diagnosticoController.clear();
     bool enlazarSintoma = false;
     String? sintomaId;
+    bool enlazarDocumento = false;
+    String? documentoId;
 
     List<dynamic> sintomas = [];
     for (var entry in historial) {
       if (entry['sintomas']?.isNotEmpty ?? false) {
         sintomas.addAll(entry['sintomas']);
+      }
+    }
+
+    List<dynamic> documentosAnalisis = [];
+    for (var entry in historial) {
+      if (entry['documentos']?.isNotEmpty ?? false) {
+        documentosAnalisis.addAll(
+          entry['documentos'].where((doc) => doc['tipo'] == 'resultado_analisis').map((e) => {...e, 'historialId': entry['_id']}),
+        );
       }
     }
 
@@ -627,6 +858,96 @@ class HistorialDialogs {
                     ),
                   ),
                 ],
+                const SizedBox(height: 16),
+                Text(
+                  '¿Enlazar a un resultado de análisis?',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: colors['accent'],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ToggleButtons(
+                  borderRadius: BorderRadius.circular(10),
+                  selectedColor: Colors.white,
+                  selectedBorderColor: colors['accent'],
+                  fillColor: colors['accent'],
+                  borderColor: Colors.grey.shade300,
+                  children: const [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Text('No'),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Text('Sí'),
+                    ),
+                  ],
+                  isSelected: [!enlazarDocumento, enlazarDocumento],
+                  onPressed: (index) {
+                    setStateDialog(() {
+                      enlazarDocumento = index == 1;
+                      if (!enlazarDocumento) {
+                        documentoId = null;
+                      }
+                    });
+                  },
+                ),
+                if (enlazarDocumento && documentosAnalisis.isEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                    'No hay resultados de análisis registrados.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+                if (enlazarDocumento && documentosAnalisis.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Seleccionar resultado de análisis',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colors['accent'],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.grey.shade50,
+                    ),
+                    child: DropdownButton<String>(
+                      value: documentoId,
+                      isExpanded: true,
+                      hint: const Text('Selecciona un resultado de análisis'),
+                      items: documentosAnalisis.map((documento) {
+                        return DropdownMenuItem<String>(
+                          value: documento['_id'],
+                          child: Text(
+                            documento['nombre'] ?? 'Resultado de Análisis (ID: ${documento['_id']})',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setStateDialog(() {
+                          documentoId = newValue;
+                        });
+                      },
+                      underline: const SizedBox(),
+                      icon: Icon(
+                        Icons.arrow_drop_down,
+                        color: colors['accent'],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           );
@@ -642,6 +963,7 @@ class HistorialDialogs {
         final datos = {
           'descripcion': _diagnosticoController.text,
           if (sintomaId != null) 'sintoma_id': sintomaId,
+          if (documentoId != null) 'documento_id': documentoId,
         };
         _guardarEntrada('diagnosticos', datos);
       },
@@ -1093,7 +1415,7 @@ class HistorialDialogs {
           title,
           style: TextStyle(fontWeight: FontWeight.bold, color: accentColor),
         ),
-        content: content,
+        content: SingleChildScrollView(child: content),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

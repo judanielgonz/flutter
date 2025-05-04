@@ -25,6 +25,7 @@ class _CitasPageState extends State<CitasPage> {
   bool _isLoading = true;
   String? _errorMessage;
   String? _nombreUsuario;
+  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
@@ -35,6 +36,10 @@ class _CitasPageState extends State<CitasPage> {
   }
 
   Future<void> _fetchCitas() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final apiService = ApiService();
       final citas = await apiService.getCitas(widget.correo, widget.tipoUsuario);
@@ -68,6 +73,63 @@ class _CitasPageState extends State<CitasPage> {
       print('Error al cargar el nombre del usuario: $e');
       setState(() {
         _nombreUsuario = 'Usuario';
+      });
+    }
+  }
+
+  Future<void> _cancelarCita(String citaId) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('Confirmar Cancelación', style: TextStyle(color: Colors.red)),
+        content: const Text('¿Estás seguro de que deseas cancelar esta cita?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sí', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _apiService.cancelarCita(citaId, widget.correo, widget.tipoUsuario);
+      if (response['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Cita cancelada con éxito'),
+            backgroundColor: Colors.red.shade500,
+          ),
+        );
+        await _fetchCitas();
+      } else {
+        throw Exception(response['error'] ?? 'Error al cancelar la cita');
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cancelar la cita: $_errorMessage'),
+          backgroundColor: Colors.red.shade500,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
@@ -129,9 +191,9 @@ class _CitasPageState extends State<CitasPage> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
-        statusBarColor: colors['header'], // Usar el color inicial del gradiente
-        statusBarIconBrightness: Brightness.light, // Íconos blancos
-        statusBarBrightness: Brightness.dark, // Para iOS
+        statusBarColor: colors['header'],
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
         backgroundColor: Colors.white,
@@ -518,10 +580,9 @@ class _CitasPageState extends State<CitasPage> {
                                 ],
                               ),
                             ),
-                            Icon(
-                              Icons.info_outline,
-                              color: colors['accent'],
-                              size: 24,
+                            IconButton(
+                              icon: Icon(Icons.cancel, color: Colors.red.shade500),
+                              onPressed: () => _cancelarCita(cita['_id']),
                             ),
                           ],
                         ),
