@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1003448215079",
+    "project_id": "saludgest-abb30",
+    "storage_bucket": "saludgest-abb30.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1003448215079:android:2fd8373c882e91dec05002",
+        "android_client_info": {
+          "package_name": "com.example.saludgest_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTscuYZ6AB-7noG0dUsXp4GOhm8k24NBg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

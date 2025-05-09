@@ -523,14 +523,21 @@ class HistorialDialogs {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildDialogOption(
-                title: 'Escribir Síntomas',
+                title: 'Escribir Síntomas Manualmente',
                 icon: Icons.edit,
                 onTap: () => _mostrarDialogoEscribirSintomas(),
                 colors: colors,
               ),
               const SizedBox(height: 8),
               _buildDialogOption(
-                title: 'Usar Síntomas del Historial',
+                title: 'Seleccionar Síntomas del Historial',
+                icon: Icons.checklist,
+                onTap: () => _mostrarDialogoSeleccionarSintomas(),
+                colors: colors,
+              ),
+              const SizedBox(height: 8),
+              _buildDialogOption(
+                title: 'Usar Todos los Síntomas del Historial y Seleccionar',
                 icon: Icons.history,
                 onTap: () => _usarSintomasDelHistorial(),
                 colors: colors,
@@ -627,19 +634,164 @@ class HistorialDialogs {
   }
 
   void _usarSintomasDelHistorial() {
-    final sintomasText = _extraerSintomasDelHistorial();
-    if (sintomasText.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se encontraron síntomas en el historial'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      Navigator.pop(context);
-      return;
-    }
-    _generarDiagnostico(sintomasText, true);
+  final sintomasText = _extraerSintomasDelHistorial();
+  if (sintomasText.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No se encontraron síntomas en el historial'),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+    return;
   }
+
+  // Extraer síntomas individuales para mostrarlos en el diálogo de selección
+  List<String> sintomasList = sintomasText
+      .replaceAll('Paciente con ', '')
+      .replaceAll('.', '')
+      .split(',')
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+
+  // Crear una lista de Map<String, dynamic> asegurándonos del tipo correcto
+  List<Map<String, dynamic>> sintomasParaSeleccionar = sintomasList
+      .map((sintoma) => <String, dynamic>{'descripcion': sintoma, 'selected': false})
+      .toList();
+
+  if (sintomasParaSeleccionar.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No hay síntomas válidos en el historial'),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+    return;
+  }
+
+  // Mostrar el diálogo de selección con los síntomas extraídos del historial
+  _mostrarDialogoSeleccionarSintomasConLista(sintomasParaSeleccionar);
+}
+
+void _mostrarDialogoSeleccionarSintomas() {
+  List<Map<String, dynamic>> sintomas = [];
+  for (var entry in historial) {
+    if (entry['sintomas']?.isNotEmpty ?? false) {
+      for (var sintoma in entry['sintomas']) {
+        if (sintoma is Map) {
+          // Asegurarnos de que el mapa tenga las claves correctas y sea del tipo adecuado
+          sintomas.add({
+            'descripcion': sintoma['descripcion']?.toString() ?? 'Sin descripción',
+            'selected': false,
+          });
+        }
+      }
+    }
+  }
+
+  if (sintomas.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No hay síntomas registrados en el historial'),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+    return;
+  }
+
+  _mostrarDialogoSeleccionarSintomasConLista(sintomas);
+}
+
+void _mostrarDialogoSeleccionarSintomasConLista(List<Map<String, dynamic>> sintomas) {
+  final colors = _getColorsForRole();
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: Colors.white,
+      title: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [colors['header']!, colors['headerGradient']!],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Text(
+          'Seleccionar Síntomas',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 20,
+          ),
+        ),
+      ),
+      content: Container(
+        width: 300,
+        child: StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: sintomas.map((sintoma) {
+                  return CheckboxListTile(
+                    title: Text(
+                      sintoma['descripcion'] ?? 'Sin descripción',
+                      style: TextStyle(color: colors['accent']),
+                    ),
+                    value: sintoma['selected'] as bool? ?? false,
+                    activeColor: colors['accent'],
+                    onChanged: (bool? value) {
+                      setStateDialog(() {
+                        sintoma['selected'] = value ?? false;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'Cancelar',
+            style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final selectedSintomas = sintomas
+                .where((s) => s['selected'] == true)
+                .map((s) => s['descripcion'] as String)
+                .toList();
+            if (selectedSintomas.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Por favor, selecciona al menos un síntoma'),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+              return;
+            }
+            final sintomasText = 'Paciente con ${selectedSintomas.join(", ")}.';
+            Navigator.pop(context);
+            _generarDiagnostico(sintomasText, true);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: colors['accent'],
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: const Text('Generar Diagnóstico', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildDialogOption({
     required String title,

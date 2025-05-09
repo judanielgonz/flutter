@@ -1,7 +1,6 @@
 name: saludgest_app
 description: "A new Flutter project."
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
@@ -16,12 +15,13 @@ dependencies:
   intl: ^0.18.0
   permission_handler: ^12.0.0+1
   flutter_local_notifications: ^19.0.0
-  file_picker: ^8.1.3  # Para seleccionar PDFs
-  open_file: ^3.5.10  # Para abrir PDFs descargados
-  path_provider: ^2.1.5  # Para manejar rutas de almacenamiento local
+  file_picker: ^8.1.3
+  open_file: ^3.5.10
+  path_provider: ^2.1.5
   http_parser: ^4.0.2
   uuid: ^4.5.0
-  
+  firebase_core: ^2.24.0  # Asegúrate de incluir esta línea
+  firebase_messaging: ^14.7.0  # Asegúrate de incluir esta línea
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,9 @@ import 'package:saludgest_app/interfaz.dart';
 import 'package:saludgest_app/notificaciones_service.dart';
 import 'package:saludgest_app/registro.dart';
 import 'package:saludgest_app/registro_medico.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,6 +26,11 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _notificacionesService.initialize();
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+      if (_correoController.text.isNotEmpty) {
+        _sendFcmTokenToBackend(_correoController.text, newToken);
+      }
+    });
   }
 
   String _normalize(String text) {
@@ -33,6 +41,28 @@ class _LoginPageState extends State<LoginPage> {
         .replaceAll('ó', 'o')
         .replaceAll('ú', 'u')
         .toLowerCase();
+  }
+
+  Future<void> _sendFcmTokenToBackend(String correo, String? newToken) async {
+    if (newToken == null || correo.isEmpty) {
+      print('No se puede enviar el token FCM: token o correo vacío (token: $newToken, correo: $correo)');
+      return;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:3000/api/pacientes/update-fcm-token'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'correo': correo, 'fcmToken': newToken}),
+      );
+      if (response.statusCode == 200) {
+        print('Token FCM enviado al backend con éxito para $correo: $newToken');
+      } else {
+        print('Error al enviar token FCM para $correo: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      print('Error al enviar token FCM para $correo: $e');
+    }
   }
 
   Future<void> _login() async {
@@ -51,6 +81,14 @@ class _LoginPageState extends State<LoginPage> {
       if (response['success'] == true) {
         final tipoUsuario = _normalize(response['tipoUsuario']);
         
+        // Obtener un nuevo token FCM
+        String? fcmToken = await FirebaseMessaging.instance.getToken();
+        if (fcmToken != null) {
+          await _sendFcmTokenToBackend(_correoController.text, fcmToken);
+        } else {
+          print('No se pudo obtener un token FCM para ${_correoController.text}');
+        }
+
         await _notificacionesService.showNotification(
           title: '¡Bienvenido a SaludGest!',
           body: 'Has iniciado sesión como $tipoUsuario.',

@@ -1,7 +1,17 @@
+buildscript {
+    repositories {
+        google() // Añadido para repositorios de Google
+        mavenCentral() // Añadido para repositorios de Maven Central
+    }
+    dependencies {
+        classpath 'com.google.gms:google-services:4.3.15' // Añadido para Firebase
+    }
+}
+
 allprojects {
     repositories {
-        google()
-        mavenCentral()
+        google() // Añadido para repositorios de Google
+        mavenCentral() // Añadido para repositorios de Maven Central
     }
 }
 
