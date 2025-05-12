@@ -106,7 +106,7 @@ class _HistorialPageState extends State<HistorialPage> {
       correo: widget.correo,
       tipoUsuario: widget.tipoUsuario,
       medicoCorreo: widget.medicoCorreo,
-      nombrePaciente: widget.nombre ?? 'Paciente', // Usar valor predeterminado si 'nombre' es null
+      nombrePaciente: widget.nombre ?? (widget.tipoUsuario == 'medico' ? 'Paciente' : 'Médico'), // Ajustar según tipoUsuario
       historial: historial,
       context: context,
       onHistorialUpdated: _fetchHistorial,
@@ -267,7 +267,7 @@ class _HistorialPageState extends State<HistorialPage> {
                     ),
                   ),
                   Text(
-                    widget.nombre ?? 'Paciente', // Usar valor predeterminado si 'nombre' es null
+                    widget.nombre ?? (widget.tipoUsuario == 'medico' ? 'Médico' : 'Paciente'), // Ajustar según tipoUsuario
                     style: const TextStyle(
                       fontSize: 14,
                       color: Colors.white70,

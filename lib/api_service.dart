@@ -7,7 +7,6 @@ import 'package:http_parser/http_parser.dart';
 class ApiService {
   final String baseUrl = 'http://10.0.2.2:3000';
 
-  // Login
   Future<Map<String, dynamic>> login(Map<String, String> credentials) async {
     final url = Uri.parse('$baseUrl/api/pacientes/login');
     final response = await http.post(
@@ -22,14 +21,13 @@ class ApiService {
         'tipoUsuario': data['tipoUsuario'],
         'medicoAsignado': data['medicoAsignado'],
         'usuarioId': data['usuarioId'],
-        'nombre': data['nombre'], // Añadir nombre del usuario
+        'nombre': data['nombre'],
       };
     } else {
       return json.decode(response.body);
     }
   }
 
-  // Registrar paciente
   Future<Map<String, dynamic>> savePaciente(Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/pacientes/save-data');
     final response = await http.post(
@@ -44,7 +42,6 @@ class ApiService {
     }
   }
 
-  // Registrar médico
   Future<Map<String, dynamic>> registrarMedico(Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/pacientes/registrar-medico');
     final response = await http.post(
@@ -67,7 +64,38 @@ class ApiService {
     }
   }
 
-  // Asignar médico a paciente
+  Future<Map<String, dynamic>> forgotPassword(String correo) async {
+    final url = Uri.parse('$baseUrl/api/pacientes/forgot-password');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'correo': correo}),
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception(json.decode(response.body)['error'] ?? 'Error al solicitar restablecimiento');
+    }
+  }
+
+  Future<Map<String, dynamic>> resetPassword(String correo, String token, String newPassword) async {
+    final url = Uri.parse('$baseUrl/api/pacientes/reset-password');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'correo': correo,
+        'token': token,
+        'newPassword': newPassword,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception(json.decode(response.body)['error'] ?? 'Error al restablecer contraseña');
+    }
+  }
+
   Future<Map<String, dynamic>> asignarMedico(String pacienteCorreo, String medicoCorreo) async {
     final url = Uri.parse('$baseUrl/api/pacientes/asignar-medico');
     final response = await http.post(
@@ -85,7 +113,6 @@ class ApiService {
     }
   }
 
-  // Obtener médicos disponibles
   Future<List<dynamic>> getMedicosDisponibles() async {
     final url = Uri.parse('$baseUrl/api/pacientes/medicos-disponibles');
     final response = await http.get(url);
@@ -101,7 +128,6 @@ class ApiService {
     }
   }
 
-  // Registrar disponibilidad
   Future<Map<String, dynamic>> registrarDisponibilidad(Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/pacientes/registrar-disponibilidad');
     final response = await http.post(
@@ -122,7 +148,6 @@ class ApiService {
     }
   }
 
-  // Obtener disponibilidades
   Future<List<dynamic>> getDisponibilidades(String medicoCorreo) async {
     final url = Uri.parse('$baseUrl/api/pacientes/disponibilidad');
     final response = await http.get(url);
@@ -135,7 +160,6 @@ class ApiService {
     }
   }
 
-  // Agendar una cita
   Future<Map<String, dynamic>> agendarCita(Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/pacientes/agendar-cita');
     final response = await http.post(
@@ -156,7 +180,6 @@ class ApiService {
     }
   }
 
-  // Cancelar una cita
   Future<Map<String, dynamic>> cancelarCita(String citaId, String usuarioCorreo, String tipoUsuario) async {
     final url = Uri.parse('$baseUrl/api/citas/cancelar-cita');
     final response = await http.post(
@@ -176,9 +199,8 @@ class ApiService {
     }
   }
 
-  // Obtener citas
   Future<List<dynamic>> getCitas(String correo, String tipoUsuario) async {
-    final url = Uri.parse('$baseUrl/api/pacientes/citas?correo=$correo&tipoUsuario=$tipoUsuario');
+    final url = Uri.parse('$baseUrl/api/citas/citas?correo=$correo&tipoUsuario=$tipoUsuario');
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -192,7 +214,6 @@ class ApiService {
     }
   }
 
-  // Obtener datos de un paciente por correo
   Future<Map<String, dynamic>> getPacienteByCorreo(String correo) async {
     final url = Uri.parse('$baseUrl/api/pacientes/datos?correo=$correo');
     final response = await http.get(url);
@@ -208,7 +229,6 @@ class ApiService {
     }
   }
 
-  // Obtener persona por ID
   Future<Map<String, dynamic>> obtenerPorId(String id) async {
     final url = Uri.parse('$baseUrl/api/pacientes/obtener-por-id?id=$id');
     final response = await http.get(url);
@@ -224,7 +244,6 @@ class ApiService {
     }
   }
 
-  // Obtener mensajes
   Future<List<Map<String, String>>> getMessages(String userId) async {
     final url = Uri.parse('$baseUrl/api/mensajes/$userId');
     final response = await http.get(url);
@@ -235,7 +254,6 @@ class ApiService {
     }
   }
 
-  // Enviar mensaje
   Future<void> sendMessage(String userId, String message) async {
     final url = Uri.parse('$baseUrl/api/mensajes/enviar');
     final response = await http.post(
@@ -248,7 +266,6 @@ class ApiService {
     }
   }
 
-  // Eliminar disponibilidad
   Future<Map<String, dynamic>> eliminarDisponibilidad(Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/pacientes/eliminar-disponibilidad');
     final response = await http.post(
@@ -268,7 +285,6 @@ class ApiService {
     }
   }
 
-  // Actualizar disponibilidad
   Future<Map<String, dynamic>> actualizarDisponibilidad(Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/pacientes/actualizar-disponibilidad');
     final response = await http.post(
@@ -291,7 +307,6 @@ class ApiService {
     }
   }
 
-  // Obtener historial médico por correo
   Future<List<dynamic>> getHistorialMedico(String correo) async {
     final url = Uri.parse('$baseUrl/api/historial/obtener-por-correo?correo=$correo');
     final response = await http.get(url);
@@ -307,7 +322,6 @@ class ApiService {
     }
   }
 
-  // Guardar una entrada en el historial médico
   Future<Map<String, dynamic>> guardarEntradaHistorial(
       String correoRegistrador, String tipo, String pacienteCorreo, Map<String, dynamic> datos, String nombrePaciente) async {
     final url = Uri.parse('$baseUrl/api/historial/guardar-entrada');
@@ -319,7 +333,7 @@ class ApiService {
         'tipo': tipo,
         'pacienteCorreo': pacienteCorreo,
         'datos': datos,
-        'nombrePaciente': nombrePaciente, // Enviar nombre del paciente
+        'nombrePaciente': nombrePaciente,
       }),
     );
 
@@ -338,14 +352,13 @@ class ApiService {
     }
   }
 
-  // Subir un documento al historial médico
   Future<Map<String, dynamic>> subirDocumento(
       String correoRegistrador, String pacienteCorreo, File file, String nombrePaciente) async {
     final url = Uri.parse('$baseUrl/api/historial/subir-documento');
     final request = http.MultipartRequest('POST', url);
     request.fields['correo'] = correoRegistrador;
     request.fields['pacienteCorreo'] = pacienteCorreo;
-    request.fields['nombrePaciente'] = nombrePaciente; // Enviar nombre del paciente
+    request.fields['nombrePaciente'] = nombrePaciente;
     request.files.add(
       await http.MultipartFile.fromPath(
         'documento',
@@ -368,7 +381,6 @@ class ApiService {
     }
   }
 
-  // Subir un resultado de análisis al historial médico
   Future<Map<String, dynamic>> subirResultadoAnalisis(
       String correoRegistrador, String pacienteCorreo, String ordenId, File file, String nombrePaciente) async {
     final url = Uri.parse('$baseUrl/api/historial/subir-resultado-analisis');
@@ -376,7 +388,7 @@ class ApiService {
     request.fields['correo'] = correoRegistrador;
     request.fields['pacienteCorreo'] = pacienteCorreo;
     request.fields['orden_id'] = ordenId;
-    request.fields['nombrePaciente'] = nombrePaciente; // Enviar nombre del paciente
+    request.fields['nombrePaciente'] = nombrePaciente;
     request.files.add(
       await http.MultipartFile.fromPath(
         'documento',
@@ -399,7 +411,6 @@ class ApiService {
     }
   }
 
-  // Descargar un documento del historial médico
   Future<String> descargarDocumento(String historialId, String documentoId) async {
     final url = Uri.parse('$baseUrl/api/historial/descargar-documento/$historialId/$documentoId');
     final response = await http.get(url);
@@ -415,7 +426,6 @@ class ApiService {
     }
   }
 
-  // Generar diagnóstico con IA
   Future<Map<String, dynamic>> generarDiagnostico(String symptomsText) async {
     final url = Uri.parse('$baseUrl/api/historial/generar-diagnostico');
     final response = await http.post(
@@ -433,7 +443,6 @@ class ApiService {
     }
   }
 
-  // Obtener pacientes asignados a un médico
   Future<List<dynamic>> getPacientesAsignados(String medicoId) async {
     final url = Uri.parse('$baseUrl/api/pacientes/obtener-pacientes-asignados?medicoId=$medicoId');
     final response = await http.get(url);
@@ -449,7 +458,6 @@ class ApiService {
     }
   }
 
-  // Obtener lista de pacientes
   Future<List<dynamic>> getPacientes() async {
     final url = Uri.parse('$baseUrl/api/pacientes?rol=Paciente');
     final response = await http.get(url);
@@ -460,7 +468,6 @@ class ApiService {
     }
   }
 
-  // Obtener notificaciones
   Future<List<dynamic>> getNotificaciones(String usuarioId) async {
     final url = Uri.parse('$baseUrl/api/notificaciones?usuarioId=$usuarioId');
     final response = await http.get(url);
@@ -471,7 +478,6 @@ class ApiService {
     }
   }
 
-  // Marcar todas las notificaciones como borradas
   Future<void> marcarTodasNotificacionesBorradas(String usuarioId) async {
     final url = Uri.parse('$baseUrl/api/notificaciones/marcar-todas-borradas');
     final response = await http.post(
@@ -489,7 +495,21 @@ class ApiService {
     }
   }
 
-  // Registrar alarma
+  Future<Map<String, dynamic>> crearNotificacion(Map<String, dynamic> data) async {
+    final url = Uri.parse('$baseUrl/api/notificaciones/crear');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode(data),
+    );
+    if (response.statusCode == 201) {
+      return json.decode(response.body);
+    } else {
+      final responseBody = json.decode(response.body);
+      throw Exception(responseBody['error'] ?? 'Error al crear la notificación: ${response.body}');
+    }
+  }
+
   Future<void> registrarAlarma(String correo, Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/alarmas');
     final response = await http.post(
@@ -502,7 +522,6 @@ class ApiService {
     }
   }
 
-  // Actualizar datos de persona
   Future<Map<String, dynamic>> updatePersona(String correo, Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/pacientes/update');
     final response = await http.put(
@@ -517,7 +536,6 @@ class ApiService {
     }
   }
 
-  // Otorgar permiso a otro médico
   Future<Map<String, dynamic>> otorgarPermisoHistorial(String pacienteCorreo, String medicoCorreo) async {
     final url = Uri.parse('$baseUrl/api/pacientes/otorgar-permiso');
     final response = await http.post(
@@ -535,7 +553,6 @@ class ApiService {
     }
   }
 
-  // Obtener médicos con acceso
   Future<List<String>> getMedicosConAcceso(String pacienteCorreo) async {
     final url = Uri.parse('$baseUrl/api/pacientes/medicos-con-acceso?pacienteCorreo=$pacienteCorreo');
     final response = await http.get(url);
@@ -552,7 +569,6 @@ class ApiService {
     }
   }
 
-  // Enviar notificaciones a múltiples usuarios
   Future<void> enviarNotificaciones(List<String> usuarioIds, String contenido) async {
     final url = Uri.parse('$baseUrl/api/notificaciones/enviar');
     final response = await http.post(

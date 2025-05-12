@@ -22,6 +22,7 @@ class _CitasPageState extends State<CitasPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   List<dynamic> _citas = [];
+  List<dynamic> _historialCitas = [];
   bool _isLoading = true;
   String? _errorMessage;
   String? _nombreUsuario;
@@ -32,6 +33,7 @@ class _CitasPageState extends State<CitasPage> {
     super.initState();
     initializeDateFormatting('es_ES', null);
     _fetchCitas();
+    _fetchHistorialCitas();
     _fetchNombreUsuario();
   }
 
@@ -41,10 +43,28 @@ class _CitasPageState extends State<CitasPage> {
       _errorMessage = null;
     });
     try {
-      final apiService = ApiService();
-      final citas = await apiService.getCitas(widget.correo, widget.tipoUsuario);
+      final citas = await _apiService.getCitas(widget.correo, widget.tipoUsuario);
       setState(() {
-        _citas = citas;
+        _citas = citas.where((cita) => cita['estado'] == 'Programada').toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchHistorialCitas() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final citas = await _apiService.getCitas(widget.correo, widget.tipoUsuario);
+      setState(() {
+        _historialCitas = citas.where((cita) => cita['estado'] == 'Realizada' || cita['estado'] == 'Cancelada').toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -114,6 +134,7 @@ class _CitasPageState extends State<CitasPage> {
           ),
         );
         await _fetchCitas();
+        await _fetchHistorialCitas();
       } else {
         throw Exception(response['error'] ?? 'Error al cancelar la cita');
       }
@@ -210,6 +231,8 @@ class _CitasPageState extends State<CitasPage> {
                       _buildCalendarSection(colors, events),
                       const SizedBox(height: 20),
                       _buildCitasSection(colors),
+                      const SizedBox(height: 20),
+                      _buildCitasLogSection(colors),
                     ],
                   ),
                 ),
@@ -516,6 +539,8 @@ class _CitasPageState extends State<CitasPage> {
                           : (cita['persona_paciente_id'] != null
                               ? cita['persona_paciente_id']['nombre_completo']
                               : 'Paciente desconocido');
+                      final estado = cita['estado'] ?? 'Programada';
+                      final consultorio = cita['consultorio'] ?? 'No especificado';
                       return Container(
                         margin: const EdgeInsets.symmetric(vertical: 8),
                         padding: const EdgeInsets.all(16),
@@ -577,12 +602,217 @@ class _CitasPageState extends State<CitasPage> {
                                       color: Colors.black54,
                                     ),
                                   ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Consultorio: $consultorio",
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Estado: $estado",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                             IconButton(
                               icon: Icon(Icons.cancel, color: Colors.red.shade500),
                               onPressed: () => _cancelarCita(cita['_id']),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+      ],
+    );
+  }
+
+  Widget _buildCitasLogSection(Map<String, Color> colors) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.history,
+              color: colors['accent'],
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              "Historial de Citas",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: colors['accent'],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _errorMessage != null
+            ? Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    'Error al cargar el historial de citas: $_errorMessage',
+                    style: const TextStyle(color: Colors.red, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+            : _historialCitas.isEmpty
+                ? Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        "No hay historial de citas",
+                        style: TextStyle(fontSize: 16, color: Colors.black54),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _historialCitas.length,
+                    itemBuilder: (context, index) {
+                      final cita = _historialCitas[index];
+                      String fecha;
+                      try {
+                        fecha = DateFormat('dd/MM/yyyy').format(
+                          DateFormat('yyyy-MM-dd').parse(cita['fecha']),
+                        );
+                      } catch (e) {
+                        fecha = 'Fecha no válida';
+                      }
+                      final nombre = widget.tipoUsuario == 'paciente'
+                          ? (cita['persona_medico_id'] != null
+                              ? cita['persona_medico_id']['nombre_completo']
+                              : 'Médico desconocido')
+                          : (cita['persona_paciente_id'] != null
+                              ? cita['persona_paciente_id']['nombre_completo']
+                              : 'Paciente desconocido');
+                      final estado = cita['estado'] ?? 'Desconocido';
+                      final consultorio = cita['consultorio'] ?? 'No especificado';
+                      return Container(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: colors['accent']!),
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colors['accent']!.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.history,
+                                color: colors['accent'],
+                                size: 30,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Cita el $fecha",
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Horario: ${cita['hora_inicio'] ?? 'N/A'} - ${cita['hora_fin'] ?? 'N/A'}",
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.tipoUsuario == 'paciente'
+                                        ? "Médico: $nombre"
+                                        : "Paciente: $nombre",
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Consultorio: $consultorio",
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Estado: $estado",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: estado == 'Cancelada' ? Colors.red : Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  if (cita['cancelado_por'] != null)
+                                    Text(
+                                      "Cancelado por: ${cita['cancelado_por']}",
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                           ],
                         ),

@@ -18,8 +18,14 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _correoController = TextEditingController();
   final _contrasenaController = TextEditingController();
+  final _resetCorreoController = TextEditingController();
+  final _tokenController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
+  bool _showForgotPassword = false;
+  bool _showResetPassword = false;
   final NotificacionesService _notificacionesService = NotificacionesService();
 
   @override
@@ -81,7 +87,6 @@ class _LoginPageState extends State<LoginPage> {
       if (response['success'] == true) {
         final tipoUsuario = _normalize(response['tipoUsuario']);
         
-        // Obtener un nuevo token FCM
         String? fcmToken = await FirebaseMessaging.instance.getToken();
         if (fcmToken != null) {
           await _sendFcmTokenToBackend(_correoController.text, fcmToken);
@@ -134,6 +139,86 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _forgotPassword() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final apiService = ApiService();
+      final response = await apiService.forgotPassword(_resetCorreoController.text);
+      if (response['success'] == true) {
+        setState(() {
+          _showForgotPassword = false;
+          _showResetPassword = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Correo de restablecimiento enviado')),
+        );
+      } else {
+        setState(() {
+          _errorMessage = response['error'] ?? 'Error al solicitar restablecimiento';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    if (_newPasswordController.text != _confirmPasswordController.text) {
+      setState(() {
+        _errorMessage = 'Las contraseñas no coinciden';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final apiService = ApiService();
+      final response = await apiService.resetPassword(
+        _resetCorreoController.text,
+        _tokenController.text,
+        _newPasswordController.text,
+      );
+      if (response['success'] == true) {
+        setState(() {
+          _showResetPassword = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Contraseña actualizada correctamente')),
+        );
+        _resetCorreoController.clear();
+        _tokenController.clear();
+        _newPasswordController.clear();
+        _confirmPasswordController.clear();
+      } else {
+        setState(() {
+          _errorMessage = response['error'] ?? 'Error al restablecer contraseña';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,81 +252,11 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        Text(
-                          "Iniciar Sesión",
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade500,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextField(
-                          controller: _correoController,
-                          decoration: InputDecoration(
-                            labelText: "Correo",
-                            labelStyle: TextStyle(color: Colors.blue.shade500),
-                            border: const OutlineInputBorder(),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(color: Colors.blue.shade500),
-                            ),
-                            prefixIcon: Icon(Icons.email, color: Colors.red.shade500),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextField(
-                          controller: _contrasenaController,
-                          decoration: InputDecoration(
-                            labelText: "Contraseña",
-                            labelStyle: TextStyle(color: Colors.blue.shade500),
-                            border: const OutlineInputBorder(),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(color: Colors.blue.shade500),
-                            ),
-                            prefixIcon: Icon(Icons.lock, color: Colors.red.shade500),
-                          ),
-                          obscureText: true,
-                        ),
-                        const SizedBox(height: 20),
-                        if (_errorMessage != null)
-                          Text(
-                            _errorMessage!,
-                            style: TextStyle(color: Colors.red.shade500),
-                          ),
-                        const SizedBox(height: 20),
-                        _isLoading
-                            ? CircularProgressIndicator(color: Colors.red.shade500)
-                            : ElevatedButton(
-                                onPressed: _login,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue.shade600,
-                                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                child: const Text(
-                                  "Iniciar Sesión",
-                                  style: TextStyle(fontSize: 18, color: Colors.white),
-                                ),
-                              ),
-                        const SizedBox(height: 20),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => RegistroPage()),
-                            );
-                          },
-                          child: Text(
-                            "¿No tienes cuenta? Regístrate",
-                            style: TextStyle(color: Colors.red.shade500),
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: _showForgotPassword
+                        ? _buildForgotPasswordForm()
+                        : _showResetPassword
+                            ? _buildResetPasswordForm()
+                            : _buildLoginForm(),
                   ),
                 ),
               ],
@@ -252,10 +267,260 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  Widget _buildLoginForm() {
+    return Column(
+      children: [
+        Text(
+          "Iniciar Sesión",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.blue.shade500,
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _correoController,
+          decoration: InputDecoration(
+            labelText: "Correo",
+            labelStyle: TextStyle(color: Colors.blue.shade500),
+            border: const OutlineInputBorder(),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.blue.shade500),
+            ),
+            prefixIcon: Icon(Icons.email, color: Colors.red.shade500),
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _contrasenaController,
+          decoration: InputDecoration(
+            labelText: "Contraseña",
+            labelStyle: TextStyle(color: Colors.blue.shade500),
+            border: const OutlineInputBorder(),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.blue.shade500),
+            ),
+            prefixIcon: Icon(Icons.lock, color: Colors.red.shade500),
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 20),
+        if (_errorMessage != null)
+          Text(
+            _errorMessage!,
+            style: TextStyle(color: Colors.red.shade500),
+          ),
+        const SizedBox(height: 20),
+        _isLoading
+            ? CircularProgressIndicator(color: Colors.red.shade500)
+            : ElevatedButton(
+                onPressed: _login,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade600,
+                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  "Iniciar Sesión",
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
+              ),
+        const SizedBox(height: 20),
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _showForgotPassword = true;
+              _errorMessage = null;
+            });
+          },
+          child: Text(
+            "¿Olvidaste tu contraseña?",
+            style: TextStyle(color: Colors.red.shade500),
+          ),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => RegistroPage()),
+            );
+          },
+          child: Text(
+            "¿No tienes cuenta? Regístrate",
+            style: TextStyle(color: Colors.red.shade500),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildForgotPasswordForm() {
+    return Column(
+      children: [
+        Text(
+          "Recuperar Contraseña",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.blue.shade500,
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _resetCorreoController,
+          decoration: InputDecoration(
+            labelText: "Correo",
+            labelStyle: TextStyle(color: Colors.blue.shade500),
+            border: const OutlineInputBorder(),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.blue.shade500),
+            ),
+            prefixIcon: Icon(Icons.email, color: Colors.red.shade500),
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (_errorMessage != null)
+          Text(
+            _errorMessage!,
+            style: TextStyle(color: Colors.red.shade500),
+          ),
+        const SizedBox(height: 20),
+        _isLoading
+            ? CircularProgressIndicator(color: Colors.red.shade500)
+            : ElevatedButton(
+                onPressed: _forgotPassword,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade600,
+                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  "Enviar Correo",
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
+              ),
+        const SizedBox(height: 20),
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _showForgotPassword = false;
+              _errorMessage = null;
+            });
+          },
+          child: Text(
+            "Volver al inicio de sesión",
+            style: TextStyle(color: Colors.red.shade500),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResetPasswordForm() {
+    return Column(
+      children: [
+        Text(
+          "Restablecer Contraseña",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.blue.shade500,
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _tokenController,
+          decoration: InputDecoration(
+            labelText: "Token",
+            labelStyle: TextStyle(color: Colors.blue.shade500),
+            border: const OutlineInputBorder(),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.blue.shade500),
+            ),
+            prefixIcon: Icon(Icons.vpn_key, color: Colors.red.shade500),
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _newPasswordController,
+          decoration: InputDecoration(
+            labelText: "Nueva Contraseña",
+            labelStyle: TextStyle(color: Colors.blue.shade500),
+            border: const OutlineInputBorder(),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.blue.shade500),
+            ),
+            prefixIcon: Icon(Icons.lock, color: Colors.red.shade500),
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _confirmPasswordController,
+          decoration: InputDecoration(
+            labelText: "Confirmar Contraseña",
+            labelStyle: TextStyle(color: Colors.blue.shade500),
+            border: const OutlineInputBorder(),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.blue.shade500),
+            ),
+            prefixIcon: Icon(Icons.lock, color: Colors.red.shade500),
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 20),
+        if (_errorMessage != null)
+          Text(
+            _errorMessage!,
+            style: TextStyle(color: Colors.red.shade500),
+          ),
+        const SizedBox(height: 20),
+        _isLoading
+            ? CircularProgressIndicator(color: Colors.red.shade500)
+            : ElevatedButton(
+                onPressed: _resetPassword,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade600,
+                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  "Restablecer Contraseña",
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
+              ),
+        const SizedBox(height: 20),
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _showResetPassword = false;
+              _errorMessage = null;
+            });
+          },
+          child: Text(
+            "Volver al inicio de sesión",
+            style: TextStyle(color: Colors.red.shade500),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   void dispose() {
     _correoController.dispose();
     _contrasenaController.dispose();
+    _resetCorreoController.dispose();
+    _tokenController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 }
