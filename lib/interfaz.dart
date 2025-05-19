@@ -13,6 +13,7 @@ import 'registrar_disponibilidad.dart';
 import 'agendar_cita.dart' as agendarCita;
 import 'asignar_medico.dart';
 import 'seleccionar_paciente.dart';
+import 'screens/alarmas_page.dart'; // Corregir la ruta
 
 class InterfazPage extends StatefulWidget {
   final String correo;
@@ -338,6 +339,18 @@ class _InterfazPageState extends State<InterfazPage> {
                   tipoUsuario: widget.tipoUsuario,
                   medicoCorreo: null,
                 ),
+              ),
+            );
+          },
+        },
+        {
+          'title': 'Alarmas',
+          'icon': Icons.alarm,
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AlarmasPage(correo: widget.correo),
               ),
             );
           },

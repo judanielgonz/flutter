@@ -512,13 +512,48 @@ class ApiService {
 
   Future<void> registrarAlarma(String correo, Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/api/alarmas');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'correo': correo, ...data}),
-    );
-    if (response.statusCode != 201) {
-      throw Exception('Error al registrar alarma: ${response.body}');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'pacienteCorreo': correo, ...data}),
+      );
+      if (response.statusCode != 201) {
+        final errorBody = json.decode(response.body);
+        throw Exception(errorBody['error'] ?? 'Error al registrar alarma: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error al registrar alarma: $e');
+    }
+  }
+
+  Future<void> editarAlarma(String id, Map<String, dynamic> data) async {
+    final url = Uri.parse('$baseUrl/api/alarmas/$id');
+    try {
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(data),
+      );
+      if (response.statusCode != 200) {
+        final errorBody = json.decode(response.body);
+        throw Exception(errorBody['error'] ?? 'Error al editar alarma: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error al editar alarma: $e');
+    }
+  }
+
+  Future<void> eliminarAlarma(String id) async {
+    final url = Uri.parse('$baseUrl/api/alarmas/$id');
+    try {
+      final response = await http.delete(url);
+      if (response.statusCode != 200) {
+        final errorBody = json.decode(response.body);
+        throw Exception(errorBody['error'] ?? 'Error al eliminar alarma: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error al eliminar alarma: $e');
     }
   }
 
@@ -566,6 +601,25 @@ class ApiService {
       }
     } else {
       throw Exception('Error al obtener médicos con acceso: ${response.body}');
+    }
+  }
+
+  Future<List<dynamic>> getAlarmas(String correo) async {
+    final url = Uri.parse('$baseUrl/api/alarmas?correo=$correo');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return data['alarmas'] ?? [];
+        } else {
+          throw Exception(data['error'] ?? 'Error al obtener las alarmas');
+        }
+      } else {
+        throw Exception('Error al obtener las alarmas: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error al obtener las alarmas: $e');
     }
   }
 
