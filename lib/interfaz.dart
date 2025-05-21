@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'citas.dart';
 import 'chat.dart';
 import 'historial.dart';
@@ -13,7 +14,8 @@ import 'registrar_disponibilidad.dart';
 import 'agendar_cita.dart' as agendarCita;
 import 'asignar_medico.dart';
 import 'seleccionar_paciente.dart';
-import 'screens/alarmas_page.dart'; // Corregir la ruta
+import 'screens/alarmas_page.dart';
+import 'confirmar_alarma.dart';
 
 class InterfazPage extends StatefulWidget {
   final String correo;
@@ -36,6 +38,7 @@ class InterfazPage extends StatefulWidget {
 class _InterfazPageState extends State<InterfazPage> {
   String? _medicoAsignado;
   int _selectedIndex = 0;
+  bool _hasPendingAlarm = false;
 
   @override
   void initState() {
@@ -43,7 +46,18 @@ class _InterfazPageState extends State<InterfazPage> {
     _medicoAsignado = widget.medicoAsignado;
     if (widget.tipoUsuario == 'paciente') {
       _fetchUsuarioData();
+      _checkPendingAlarmsWithRetry();
+      // Verificar alarmas periódicamente cada 30 segundos
+      Future.doWhile(() async {
+        await Future.delayed(Duration(seconds: 30));
+        if (mounted) {
+          await _checkPendingAlarms();
+          return true;
+        }
+        return false;
+      });
     }
+    print('Tipo de usuario: ${widget.tipoUsuario}, _hasPendingAlarm: $_hasPendingAlarm');
   }
 
   Future<void> _fetchUsuarioData() async {
@@ -61,6 +75,59 @@ class _InterfazPageState extends State<InterfazPage> {
       }
     } catch (e) {
       print('Error al cargar los datos del usuario: $e');
+    }
+  }
+
+  Future<void> _checkPendingAlarmsWithRetry() async {
+    const maxRetries = 3;
+    int retryCount = 0;
+    bool success = false;
+
+    while (retryCount < maxRetries && !success) {
+      try {
+        await _checkPendingAlarms();
+        success = true;
+      } catch (e) {
+        retryCount++;
+        print('Intento $retryCount fallido al verificar alarmas: $e');
+        if (retryCount < maxRetries) {
+          await Future.delayed(Duration(seconds: 2));
+        } else {
+          print('Fallo al verificar alarmas después de $maxRetries intentos');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al verificar alarmas: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _checkPendingAlarms() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:3000/api/alarmas?correo=${widget.correo}'),
+      );
+      print('Respuesta del servidor (checkPendingAlarms): ${response.body}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          final alarmas = data['alarmas'] ?? [];
+          print('Alarmas encontradas (checkPendingAlarms): $alarmas');
+          setState(() {
+            _hasPendingAlarm = alarmas.any((alarma) =>
+                alarma['estadoNotificacion'] == 'pendiente' ||
+                alarma['estadoNotificacion'] == 'no tomado');
+          });
+          print('Actualizado _hasPendingAlarm a: $_hasPendingAlarm');
+        } else {
+          print('Error en la respuesta del servidor: ${data['error']}');
+        }
+      } else {
+        print('Error en la solicitud HTTP: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error al verificar alarmas pendientes: $e');
+      rethrow; // Para que el mecanismo de reintentos lo capture
     }
   }
 
@@ -153,12 +220,44 @@ class _InterfazPageState extends State<InterfazPage> {
         );
         break;
       case 3:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
+        // Limpiar datos almacenados al cerrar sesión
+        _logout();
+        break;
+      case 4:
+        if (_hasPendingAlarm && widget.tipoUsuario == 'paciente') {
+          print('Navegando a ConfirmarAlarmaPage - _hasPendingAlarm: $_hasPendingAlarm, tipoUsuario: ${widget.tipoUsuario}');
+          try {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ConfirmarAlarmaPage(correo: widget.correo),
+              ),
+            ).then((_) {
+              _checkPendingAlarms();
+            });
+          } catch (e) {
+            print('Error al navegar a ConfirmarAlarmaPage: $e');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error al abrir la página de alarmas: $e')),
+            );
+          }
+        } else {
+          print('No se navega - _hasPendingAlarm: $_hasPendingAlarm, tipoUsuario: ${widget.tipoUsuario}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No hay alarmas pendientes o no eres paciente.')),
+          );
+        }
         break;
     }
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // Limpiar todos los datos almacenados
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
   }
 
   @override
@@ -191,24 +290,49 @@ class _InterfazPageState extends State<InterfazPage> {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Inicio',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: 'Notificaciones',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Configuración',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.logout),
-            label: 'Cerrar Sesión',
-          ),
-        ],
+        items: widget.tipoUsuario == 'paciente'
+            ? [
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: 'Inicio',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.notifications),
+                  label: 'Notificaciones',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.settings),
+                  label: 'Configuración',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.logout),
+                  label: 'Cerrar Sesión',
+                ),
+                BottomNavigationBarItem(
+                  icon: _hasPendingAlarm
+                      ? Icon(Icons.alarm, color: Colors.red)
+                      : Icon(Icons.alarm, color: Colors.white70),
+                  label: 'Alarma',
+                ),
+              ]
+            : const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: 'Inicio',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.notifications),
+                  label: 'Notificaciones',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.settings),
+                  label: 'Configuración',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.logout),
+                  label: 'Cerrar Sesión',
+                ),
+              ],
       ),
     );
   }

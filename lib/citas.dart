@@ -155,6 +155,101 @@ class _CitasPageState extends State<CitasPage> {
     }
   }
 
+  Future<void> _editarCita(String citaId, Map<String, dynamic> citaActual) async {
+    final TextEditingController fechaController = TextEditingController(
+      text: DateFormat('yyyy-MM-dd').format(DateFormat('yyyy-MM-dd').parse(citaActual['fecha'])),
+    );
+    final TextEditingController horaInicioController = TextEditingController(text: citaActual['hora_inicio']);
+    final TextEditingController horaFinController = TextEditingController(text: citaActual['hora_fin']);
+    final TextEditingController consultorioController = TextEditingController(text: citaActual['consultorio'] ?? '');
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('Editar Cita', style: TextStyle(color: Colors.blue)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: fechaController,
+                decoration: const InputDecoration(labelText: 'Fecha (YYYY-MM-DD)'),
+                keyboardType: TextInputType.datetime,
+              ),
+              TextField(
+                controller: horaInicioController,
+                decoration: const InputDecoration(labelText: 'Hora Inicio (HH:MM)'),
+                keyboardType: TextInputType.datetime,
+              ),
+              TextField(
+                controller: horaFinController,
+                decoration: const InputDecoration(labelText: 'Hora Fin (HH:MM)'),
+                keyboardType: TextInputType.datetime,
+              ),
+              TextField(
+                controller: consultorioController,
+                decoration: const InputDecoration(labelText: 'Consultorio'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Guardar', style: TextStyle(color: Colors.blue)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _apiService.editarCita(citaId, widget.correo, widget.tipoUsuario, {
+        'fecha': fechaController.text,
+        'hora_inicio': horaInicioController.text,
+        'hora_fin': horaFinController.text,
+        'consultorio': consultorioController.text,
+      });
+      if (response['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Cita editada con éxito'),
+            backgroundColor: Colors.blue.shade500,
+          ),
+        );
+        await _fetchCitas();
+        await _fetchHistorialCitas();
+      } else {
+        throw Exception(response['error'] ?? 'Error al editar la cita');
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al editar la cita: $_errorMessage'),
+          backgroundColor: Colors.red.shade500,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Map<DateTime, List<dynamic>> _getEventsForDay() {
     final events = <DateTime, List<dynamic>>{};
     for (var cita in _citas) {
@@ -619,12 +714,28 @@ class _CitasPageState extends State<CitasPage> {
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
+                                  if (cita['editado_por'] != null)
+                                    Text(
+                                      "Editado por: ${cita['editado_por']}",
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
-                            IconButton(
-                              icon: Icon(Icons.cancel, color: Colors.red.shade500),
-                              onPressed: () => _cancelarCita(cita['_id']),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.edit, color: Colors.blue.shade500),
+                                  onPressed: () => _editarCita(cita['_id'], cita),
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.cancel, color: Colors.red.shade500),
+                                  onPressed: () => _cancelarCita(cita['_id']),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -806,6 +917,14 @@ class _CitasPageState extends State<CitasPage> {
                                   if (cita['cancelado_por'] != null)
                                     Text(
                                       "Cancelado por: ${cita['cancelado_por']}",
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                  if (cita['editado_por'] != null)
+                                    Text(
+                                      "Editado por: ${cita['editado_por']}",
                                       style: const TextStyle(
                                         fontSize: 14,
                                         color: Colors.black54,

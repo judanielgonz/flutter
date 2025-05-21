@@ -199,6 +199,30 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> editarCita(
+      String citaId, String usuarioCorreo, String tipoUsuario, Map<String, dynamic> data) async {
+    final url = Uri.parse('$baseUrl/api/citas/editar-cita');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'citaId': citaId,
+        'usuarioCorreo': usuarioCorreo,
+        'tipoUsuario': tipoUsuario,
+        'fecha': data['fecha'],
+        'hora_inicio': data['hora_inicio'],
+        'hora_fin': data['hora_fin'],
+        'consultorio': data['consultorio'],
+      }),
+    );
+    final responseBody = json.decode(response.body);
+    if (response.statusCode == 200) {
+      return responseBody;
+    } else {
+      throw Exception(responseBody['error'] ?? 'Error al editar la cita: ${response.body}');
+    }
+  }
+
   Future<List<dynamic>> getCitas(String correo, String tipoUsuario) async {
     final url = Uri.parse('$baseUrl/api/citas/citas?correo=$correo&tipoUsuario=$tipoUsuario');
     final response = await http.get(url);

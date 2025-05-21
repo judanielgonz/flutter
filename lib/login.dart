@@ -7,6 +7,7 @@ import 'package:saludgest_app/registro_medico.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -37,6 +38,32 @@ class _LoginPageState extends State<LoginPage> {
         _sendFcmTokenToBackend(_correoController.text, newToken);
       }
     });
+    _checkExistingSession(); // Verificar si ya hay una sesión activa
+  }
+
+  Future<void> _checkExistingSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final correo = prefs.getString('correo');
+    final tipoUsuario = prefs.getString('tipoUsuario');
+    final usuarioId = prefs.getString('usuarioId');
+    final medicoAsignado = prefs.getString('medicoAsignado');
+
+    if (correo != null && tipoUsuario != null && usuarioId != null) {
+      print('Sesión encontrada - Navegando a InterfazPage para $correo');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => InterfazPage(
+            correo: correo,
+            tipoUsuario: tipoUsuario,
+            usuarioId: usuarioId,
+            medicoAsignado: medicoAsignado,
+          ),
+        ),
+      );
+    } else {
+      print('No hay sesión activa - Permaneciendo en LoginPage');
+    }
   }
 
   String _normalize(String text) {
@@ -86,7 +113,14 @@ class _LoginPageState extends State<LoginPage> {
 
       if (response['success'] == true) {
         final tipoUsuario = _normalize(response['tipoUsuario']);
-        
+
+        // Guardar datos en SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('correo', _correoController.text);
+        await prefs.setString('tipoUsuario', tipoUsuario);
+        await prefs.setString('usuarioId', response['usuarioId'].toString());
+        await prefs.setString('medicoAsignado', response['medicoAsignado'] ?? '');
+
         String? fcmToken = await FirebaseMessaging.instance.getToken();
         if (fcmToken != null) {
           await _sendFcmTokenToBackend(_correoController.text, fcmToken);
@@ -107,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
                 correo: _correoController.text,
                 tipoUsuario: tipoUsuario,
                 medicoAsignado: response['medicoAsignado'],
-                usuarioId: response['usuarioId'],
+                usuarioId: response['usuarioId'].toString(),
               ),
             ),
           );

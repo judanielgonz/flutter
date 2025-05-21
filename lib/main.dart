@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'login.dart';
 import 'registro.dart';
+import 'interfaz.dart';
 
 // Configuración del canal de notificaciones para Android
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -19,7 +21,6 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterL
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   print('Notificación en segundo plano recibida: ${message.notification?.title}');
-  // Mostrar notificación en segundo plano
   _showNotification(message);
 }
 
@@ -80,20 +81,31 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  Widget? _initialScreen;
+
   @override
   void initState() {
     super.initState();
+    _determineInitialScreen();
 
     // Manejar notificaciones en primer plano
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print('Notificación en primer plano recibida: ${message.notification?.title}');
       _showNotification(message);
+      if (message.data['type'] == 'alarm') {
+        print('Notificación de alarma recibida: ${message.data}');
+        // Nota: Para actualizar _hasPendingAlarm, necesitarías un sistema de estado global (e.g., Provider)
+      }
     });
 
     // Manejar notificaciones cuando la app se abre desde una notificación
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('App abierta desde notificación: ${message.notification?.title}');
-      // Aquí puedes navegar a una pantalla específica, como ChatPage
+      if (message.data['type'] == 'alarm') {
+        print('Notificación de alarma al abrir app: ${message.data}');
+        // Navegar a InterfazPage si ya está autenticado
+        _navigateIfAuthenticated();
+      }
     });
 
     // Obtener el token FCM inicial y imprimirlo para pruebas
@@ -108,6 +120,60 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  Future<void> _determineInitialScreen() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final correo = prefs.getString('correo');
+      final tipoUsuario = prefs.getString('tipoUsuario');
+      final usuarioId = prefs.getString('usuarioId');
+      final medicoAsignado = prefs.getString('medicoAsignado');
+
+      if (correo != null && tipoUsuario != null && usuarioId != null) {
+        print('Sesión encontrada - Navegando a InterfazPage para $correo');
+        setState(() {
+          _initialScreen = InterfazPage(
+            correo: correo,
+            tipoUsuario: tipoUsuario,
+            usuarioId: usuarioId,
+            medicoAsignado: medicoAsignado,
+          );
+        });
+      } else {
+        print('No hay sesión activa - Navegando a LoginPage');
+        setState(() {
+          _initialScreen = const LoginPage();
+        });
+      }
+    } catch (e) {
+      print('Error al determinar pantalla inicial: $e');
+      setState(() {
+        _initialScreen = const LoginPage();
+      });
+    }
+  }
+
+  Future<void> _navigateIfAuthenticated() async {
+    final prefs = await SharedPreferences.getInstance();
+    final correo = prefs.getString('correo');
+    final tipoUsuario = prefs.getString('tipoUsuario');
+    final usuarioId = prefs.getString('usuarioId');
+    final medicoAsignado = prefs.getString('medicoAsignado');
+
+    if (correo != null && tipoUsuario != null && usuarioId != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => InterfazPage(
+            correo: correo,
+            tipoUsuario: tipoUsuario,
+            usuarioId: usuarioId,
+            medicoAsignado: medicoAsignado,
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -115,7 +181,7 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: LoginPage(),
+      home: _initialScreen ?? const Center(child: CircularProgressIndicator()),
       routes: {
         '/registro': (context) => RegistroPage(),
         '/login': (context) => LoginPage(),
